@@ -1,0 +1,8 @@
+{
+  "name": "free-postman",
+  "version": "1.0.0",
+  "scripts": {
+    "start:frontend": "cd frontend && npm run dev",
+    "start:backend": "cd backend && npm run dev"
+  }
+}

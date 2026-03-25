@@ -520,37 +520,57 @@ export function AppProvider({ children }) {
     setActivePage('builder')
   }, [tabs])
 
+  // ─── Env Variable Substitution ────────────────────────────────────────────
+  const resolveEnvVars = useCallback((str) => {
+    if (!str) return str
+    const globalEnv = environments.find(e => e.isGlobal)
+    const activeEnvObj = environments.find(e => e.id === activeEnvId)
+    const vars = {}
+    // globals first, then active env (active overrides)
+    globalEnv?.variables?.forEach(v => { if (v.enabled && v.key) vars[v.key] = v.currentValue })
+    activeEnvObj?.variables?.forEach(v => { if (v.enabled && v.key) vars[v.key] = v.currentValue })
+    return str.replace(/\{\{([^}]+)\}\}/g, (match, key) => vars[key.trim()] !== undefined ? vars[key.trim()] : match)
+  }, [environments, activeEnvId])
+
   // ─── Send Request ─────────────────────────────────────────────────────────
   const sendRequest = useCallback(async (tabId) => {
     const tab = tabs.find(t => t.id === tabId)
     if (!tab) return
     updateTab(tabId, { loading: true, error: null, response: null })
 
+    const resolvedUrl = resolveEnvVars(tab.url)
     const logEntry = { id: Date.now(), type: 'log', timestamp: new Date().toLocaleTimeString(), source: 'network' }
-    setConsoleLogs(prev => [...prev, { ...logEntry, message: `→ ${tab.method} ${tab.url}` }])
+    setConsoleLogs(prev => [...prev, { ...logEntry, message: `→ ${tab.method} ${resolvedUrl}` }])
 
     try {
       const reqHeaders = {}
-      tab.headers.forEach(h => { if (h.enabled && h.key) reqHeaders[h.key] = h.value })
-      if (tab.auth.type === 'bearer' && tab.auth.token) reqHeaders['Authorization'] = `Bearer ${tab.auth.token}`
-      else if (tab.auth.type === 'basic' && tab.auth.username) reqHeaders['Authorization'] = `Basic ${btoa(`${tab.auth.username}:${tab.auth.password || ''}`)}`
-      else if (tab.auth.type === 'apikey' && tab.auth.key && tab.auth.addTo === 'header') reqHeaders[tab.auth.key] = tab.auth.value || ''
+      tab.headers.forEach(h => {
+        if (h.enabled && h.key) reqHeaders[resolveEnvVars(h.key)] = resolveEnvVars(h.value)
+      })
+      if (tab.auth.type === 'bearer' && tab.auth.token) reqHeaders['Authorization'] = `Bearer ${resolveEnvVars(tab.auth.token)}`
+      else if (tab.auth.type === 'basic' && tab.auth.username) {
+        const u = resolveEnvVars(tab.auth.username)
+        const p = resolveEnvVars(tab.auth.password || '')
+        reqHeaders['Authorization'] = `Basic ${btoa(`${u}:${p}`)}`
+      }
+      else if (tab.auth.type === 'apikey' && tab.auth.key && tab.auth.addTo === 'header') reqHeaders[tab.auth.key] = resolveEnvVars(tab.auth.value || '')
 
       let parsedBody
       if (!['GET', 'HEAD', 'DELETE'].includes(tab.method) && tab.bodyType === 'raw') {
-        try { parsedBody = JSON.parse(tab.body) } catch { parsedBody = tab.body }
+        const resolvedBody = resolveEnvVars(tab.body)
+        try { parsedBody = JSON.parse(resolvedBody) } catch { parsedBody = resolvedBody }
       }
-      const res = await axios.post('http://localhost:3001/proxy', { url: tab.url, method: tab.method, headers: reqHeaders, body: parsedBody })
+      const res = await axios.post('http://localhost:3001/proxy', { url: resolvedUrl, method: tab.method, headers: reqHeaders, body: parsedBody })
       const response = res.data
       setTabs(prev => prev.map(t => t.id === tabId ? { ...t, response, loading: false, error: null } : t))
       setConsoleLogs(prev => [...prev, { ...logEntry, id: Date.now() + 1, type: response.status < 400 ? 'log' : 'warn', message: `← ${response.status} ${response.statusText} (${response.time}ms)` }])
-      setHistory(prev => [{ id: `h-${Date.now()}`, method: tab.method, url: tab.url, status: response.status, time: response.time, timestamp: new Date(), tabId }, ...prev.slice(0, 49)])
+      setHistory(prev => [{ id: `h-${Date.now()}`, method: tab.method, url: resolvedUrl, status: response.status, time: response.time, timestamp: new Date(), tabId }, ...prev.slice(0, 49)])
     } catch (err) {
       const error = err.response?.data?.message || err.message || 'An error occurred'
       setTabs(prev => prev.map(t => t.id === tabId ? { ...t, loading: false, error, response: null } : t))
       setConsoleLogs(prev => [...prev, { ...logEntry, id: Date.now() + 1, type: 'error', message: `✗ Error: ${error}` }])
     }
-  }, [tabs, updateTab])
+  }, [tabs, updateTab, resolveEnvVars])
 
   // ─── Collections ──────────────────────────────────────────────────────────
   const toggleCollectionExpand = useCallback((colId) => {
@@ -617,7 +637,7 @@ export function AppProvider({ children }) {
       activePage, setActivePage,
       mockServers, monitors, flows, apis,
       modals, openModal, closeModal,
-      addTab, closeTab, updateTab, openRequest, sendRequest,
+      addTab, closeTab, updateTab, openRequest, sendRequest, resolveEnvVars,
       toggleCollectionExpand, toggleFolderExpand, addCollection,
       updateEnvironment, addEnvironment,
       addWorkspace, inviteMember, updateMemberRole, removeMember,

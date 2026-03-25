@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
-import { Copy, CheckCircle2, Send, AlertCircle, Clock, Download, Search } from 'lucide-react'
+import { Copy, CheckCircle2, Send, AlertCircle, Clock, Download, Search, Terminal } from 'lucide-react'
 
 const STATUS_INFO = {
   200: 'OK', 201: 'Created', 204: 'No Content', 301: 'Moved Permanently',
@@ -171,7 +171,7 @@ function TestResultsView({ testScript, response }) {
 const RES_TABS = ['Body', 'Headers', 'Cookies', 'Test Results']
 
 export default function ResponsePanel() {
-  const { activeTab } = useApp()
+  const { activeTab, showConsole, setShowConsole, consoleLogs } = useApp()
   const [resTab, setResTab] = useState('Body')
 
   const { response, loading, error, testScript } = activeTab || {}
@@ -221,6 +221,22 @@ export default function ResponsePanel() {
             </button>
           </div>
         )}
+        {/* Console toggle */}
+        <button
+          onClick={() => setShowConsole(!showConsole)}
+          className={`flex items-center gap-1.5 px-2 py-1 text-[10px] rounded transition-colors ml-auto ${
+            showConsole ? 'text-[#FF6C37] bg-[#FF6C37]/10' : 'text-[#5A5A5A] hover:text-[#CCCCCC] hover:bg-[#2D2D2D]'
+          }`}
+          title="Toggle Console"
+        >
+          <Terminal size={12} />
+          Console
+          {consoleLogs.length > 0 && (
+            <span className="ml-0.5 px-1 py-0.5 bg-[#3D3D3D] text-[#8D8D8D] rounded text-[9px]">
+              {consoleLogs.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Response content */}

@@ -1,9 +1,9 @@
 {
   "startupCommands": [
-    "cd backend && npm run dev",
-    "cd frontend && npm run dev"
+    "cd /home/user/app/backend && npm install; npm run dev",
+    "cd /home/user/app/frontend && npm install; npm run dev -- --host 0.0.0.0 --port 5173"
   ],
-  "projectId": "61ecfedc-1d11-454f-bf78-0aecc03b993b",
+  "projectId": "358d7d58-b6b6-406d-8d07-7357a82dfb98",
   "templateId": "any",
   "detectedFramework": "any"
 }

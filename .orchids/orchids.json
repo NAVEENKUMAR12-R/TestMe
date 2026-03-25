@@ -1,0 +1,8 @@
+{
+  "startupCommands": [
+    "cd backend && npm run dev",
+    "cd frontend && npm run dev"
+  ],
+  "projectId": "61ecfedc-1d11-454f-bf78-0aecc03b993b",
+  "templateId": "any"
+}

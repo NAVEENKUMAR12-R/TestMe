@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import { X, Play, CheckCircle2, AlertCircle, Clock, BarChart2, Settings, ChevronDown, Repeat } from 'lucide-react'
+import { X, Play, CheckCircle2, AlertCircle, Repeat } from 'lucide-react'
 
 const METHOD_COLORS = { GET: '#61AFFE', POST: '#49CC90', PUT: '#FCA130', DELETE: '#F93E3E', PATCH: '#50E3C2' }
 
@@ -17,49 +17,44 @@ function flattenRequests(items, path = '') {
 }
 
 export default function CollectionRunnerModal() {
-  const { collections, environments, activeEnvId, closeModal } = useApp()
+  const { collections, environments, activeEnvId, closeModal, runCollection } = useApp()
   const [selectedColId, setSelectedColId] = useState(collections[0]?.id || '')
   const [selectedEnvId, setSelectedEnvId] = useState(activeEnvId)
   const [iterations, setIterations] = useState(1)
   const [delay, setDelay] = useState(0)
   const [running, setRunning] = useState(false)
   const [results, setResults] = useState(null)
+  const [summary, setSummary] = useState(null)
   const [progress, setProgress] = useState(0)
 
   const selectedCol = collections.find(c => c.id === selectedColId)
-  const requests = flattenRequests(selectedCol?.items)
+  const requests = useMemo(() => flattenRequests(selectedCol?.items), [selectedCol])
 
   const handleRun = async () => {
+    if (!selectedColId) return
     setRunning(true)
     setResults(null)
-    setProgress(0)
+    setSummary(null)
+    setProgress(20)
 
-    const total = requests.length
-    const runResults = []
-
-    for (let i = 0; i < total; i++) {
-      await new Promise(r => setTimeout(r, delay + 200))
-      const req = requests[i]
-      const passed = Math.random() > 0.15
-      const status = passed ? [200, 201, 204][Math.floor(Math.random() * 3)] : [400, 404, 500][Math.floor(Math.random() * 3)]
-      runResults.push({
-        request: req,
-        status,
-        time: Math.floor(Math.random() * 400) + 50,
-        passed,
-        tests: Math.floor(Math.random() * 3) + 1,
-        testsPassed: Math.floor(Math.random() * 3) + 1,
+    try {
+      const data = await runCollection({
+        collectionId: selectedColId,
+        iterations,
+        delayMs: delay,
+        environmentId: selectedEnvId,
       })
-      setProgress(Math.round(((i + 1) / total) * 100))
+      setProgress(100)
+      setResults(data.runs || [])
+      setSummary(data.summary || null)
+    } finally {
+      setRunning(false)
     }
-
-    setResults(runResults)
-    setRunning(false)
   }
 
-  const passedCount = results?.filter(r => r.passed).length || 0
-  const failedCount = results ? results.length - passedCount : 0
-  const avgTime = results ? Math.round(results.reduce((n, r) => n + r.time, 0) / results.length) : 0
+  const passedCount = summary?.passed ?? (results?.filter(r => r.passed).length || 0)
+  const failedCount = summary?.failed ?? (results ? results.length - passedCount : 0)
+  const avgTime = summary?.avgTime ?? (results?.length ? Math.round(results.reduce((n, r) => n + r.time, 0) / results.length) : 0)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => closeModal('runner')}>

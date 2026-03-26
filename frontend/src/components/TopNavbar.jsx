@@ -12,10 +12,12 @@ export default function TopNavbar() {
     openModal, activePage, setActivePage, addTab,
   } = useApp()
 
-  const [wsDropdown, setWsDropdown]       = useState(false)
-  const [newDropdown, setNewDropdown]     = useState(false)
+  const [wsDropdown, setWsDropdown] = useState(false)
+  const [newDropdown, setNewDropdown] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
-  const [searchText, setSearchText]       = useState('')
+  const [searchText, setSearchText] = useState('')
+
+  const workspaceMembers = activeWorkspace?.members ?? []
 
   const handleSwitchWorkspace = (wsId) => {
     setActiveWorkspaceId(wsId)
@@ -221,23 +223,24 @@ export default function TopNavbar() {
         </button>
 
         {/* Workspace member avatars */}
-        <div className="hidden lg:flex items-center -space-x-1.5 ml-1">
-          {activeWorkspace.members.slice(0, 3).map(m => (
-            <div
-              key={m.id}
-              className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border-2 cursor-pointer"
-              style={{ backgroundColor: m.color + '40', color: m.color, borderColor: '#1C1C1C' }}
-              title={m.name}
-            >
-              {m.initials[0]}
-            </div>
-          ))}
-          {activeWorkspace.members.length > 3 && (
-            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-medium bg-[#2D2D2D] text-[#8D8D8D] border-2 border-[#1C1C1C]">
-              +{activeWorkspace.members.length - 3}
-            </div>
-          )}
-        </div>
+          <div className="hidden lg:flex items-center -space-x-1.5 ml-1">
+            {workspaceMembers.slice(0, 3).map(m => (
+              <div
+                key={m.id}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border-2 cursor-pointer"
+                style={{ backgroundColor: m.color + '40', color: m.color, borderColor: '#1C1C1C' }}
+                title={m.name}
+              >
+                {m.initials?.[0] || '?'}
+              </div>
+            ))}
+            {workspaceMembers.length > 3 && (
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-medium bg-[#2D2D2D] text-[#8D8D8D] border-2 border-[#1C1C1C]">
+                +{workspaceMembers.length - 3}
+              </div>
+            )}
+          </div>
+
 
         {/* User avatar */}
         <div

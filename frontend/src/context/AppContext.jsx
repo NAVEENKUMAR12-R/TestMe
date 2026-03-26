@@ -111,10 +111,27 @@ export function AppProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    hydrateWorkspace().catch((error) => {
-      appendConsole({ type: 'error', message: `Failed to load workspace: ${error.message}` })
-    })
-  }, [hydrateWorkspace, appendConsole])
+    axios.get(`${API_BASE}/api/bootstrap`)
+      .then(({ data }) => {
+        setWorkspaces(data.workspaces || [])
+        const ws = data.workspace || data.workspaces?.[0] || null
+        if (ws) setActiveWorkspaceId(ws.id)
+
+        setCollections(data.collections || [])
+        setEnvironments(data.environments || [])
+        setApis(data.apis || [])
+        setFlows(data.flows || [])
+        setMockServers(data.mockServers || [])
+        setMonitors(data.monitors || [])
+        setHistory(data.history || [])
+
+        const preferredEnv = (data.environments || []).find(e => e.isGlobal)?.id || data.environments?.[0]?.id || ''
+        setActiveEnvId(preferredEnv)
+      })
+      .catch((error) => {
+        appendConsole({ type: 'error', message: `Failed to load workspace: ${error.message}` })
+      })
+  }, [appendConsole])
 
   useEffect(() => {
     if (!activeWorkspaceId) return undefined
@@ -478,4 +495,5 @@ export function AppProvider({ children }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useApp = () => useContext(AppContext)

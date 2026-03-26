@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import { Code2, Plus, CheckCircle2, AlertCircle, Clock, ExternalLink, GitBranch, BarChart2, Zap } from 'lucide-react'
 

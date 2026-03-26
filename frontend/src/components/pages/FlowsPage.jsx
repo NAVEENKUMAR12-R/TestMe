@@ -15,16 +15,11 @@ const NODE_TYPE_CONFIG = {
 }
 
 function FlowCard({ flow }) {
-  const [hovered, setHovered] = useState(false)
   const nodes = Array.isArray(flow.nodes) ? flow.nodes : []
   const previewNodes = nodes.slice(0, 5)
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className="bg-[#252525] border border-[#3D3D3D] rounded-xl overflow-hidden hover:border-[#5A5A5A] transition-all cursor-pointer group"
-    >
+    <div className="bg-[#252525] border border-[#3D3D3D] rounded-xl overflow-hidden hover:border-[#5A5A5A] transition-all cursor-pointer group">
       {/* Flow canvas preview */}
       <div className="h-36 bg-[#1C1C1C] relative overflow-hidden p-4">
         <div className="absolute inset-0 opacity-10" style={{
@@ -102,7 +97,7 @@ function FlowBuilder({ flow, onClose }) {
       setRunning(false)
       setRunResults({
         success: true,
-        steps: flow.nodes.map((n, i) => ({
+          steps: flow.nodes.map((n) => ({
           node: n,
           status: Math.random() > 0.1 ? 'pass' : 'fail',
           duration: Math.floor(Math.random() * 300) + 50,

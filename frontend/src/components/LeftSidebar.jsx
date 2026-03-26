@@ -66,11 +66,8 @@ function FolderItem({ folder, depth = 0, collectionId }) {
 }
 
 function CollectionItem({ collection }) {
-  const { toggleCollectionExpand, openModal } = useApp()
+  const { toggleCollectionExpand } = useApp()
   const [menuOpen, setMenuOpen] = useState(false)
-
-  const requestCount = (items) =>
-    items?.reduce((n, i) => n + (i.type === 'request' ? 1 : requestCount(i.items)), 0) || 0
 
   return (
     <div className="mb-1">
@@ -387,21 +384,25 @@ export default function LeftSidebar() {
   return (
     <div className="flex h-full shrink-0">
       {/* Icon rail */}
-      <div className="w-[46px] bg-[#1C1C1C] border-r border-[#3D3D3D] flex flex-col items-center py-2 gap-1">
-        {SIDEBAR_ICONS.map(({ id, icon: Icon, label }) => (
-          <button
-            key={id}
-            onClick={() => togglePanel(id)}
-            title={label}
-            className={`w-9 h-9 flex items-center justify-center rounded transition-colors ${
-              sidePanel === id
-                ? 'bg-[#FF6C37]/15 text-[#FF6C37]'
-                : 'text-[#5A5A5A] hover:text-[#CCCCCC] hover:bg-[#2D2D2D]'
-            }`}
-          >
-            <Icon size={16} />
-          </button>
-        ))}
+        <div className="w-[46px] bg-[#1C1C1C] border-r border-[#3D3D3D] flex flex-col items-center py-2 gap-1">
+          {SIDEBAR_ICONS.map((item) => {
+            const IconComponent = item.icon
+            return (
+              <button
+                key={item.id}
+                onClick={() => togglePanel(item.id)}
+                title={item.label}
+                className={`w-9 h-9 flex items-center justify-center rounded transition-colors ${
+                  sidePanel === item.id
+                    ? 'bg-[#FF6C37]/15 text-[#FF6C37]'
+                    : 'text-[#5A5A5A] hover:text-[#CCCCCC] hover:bg-[#2D2D2D]'
+                }`}
+              >
+                <IconComponent size={16} />
+              </button>
+            )
+          })}
+
         <div className="flex-1" />
         <button className="w-9 h-9 flex items-center justify-center text-[#5A5A5A] hover:text-[#CCCCCC] hover:bg-[#2D2D2D] rounded transition-colors" title="Trash">
           <Trash2 size={15} />

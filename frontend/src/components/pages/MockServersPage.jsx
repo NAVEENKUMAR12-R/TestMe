@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext'
 import {
   Server, Plus, Globe, Lock, Activity, Copy, ExternalLink,
   CheckCircle2, Zap, MoreHorizontal, Play, Pause, Trash2,
-  BarChart2, Clock, ChevronRight,
+  BarChart2, Clock, ChevronRight, Edit2,
 } from 'lucide-react'
 
 const METHOD_COLORS = { GET: '#61AFFE', POST: '#49CC90', PUT: '#FCA130', DELETE: '#F93E3E', PATCH: '#50E3C2' }

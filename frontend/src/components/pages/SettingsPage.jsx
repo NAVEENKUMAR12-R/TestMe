@@ -288,7 +288,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <div className="text-sm font-semibold text-white">You</div>
-                    <div className="text-xs text-[#5A5A5A]">you@company.com</div>
+                      <div className="text-xs text-[#5A5A5A]">you@example.com</div>
                     <div className="mt-1.5 px-2 py-0.5 text-[10px] font-medium bg-[#FF6C37]/15 text-[#FF6C37] rounded-full w-fit">
                       Pro Plan
                     </div>
@@ -299,7 +299,7 @@ export default function SettingsPage() {
               <div className="bg-[#252525] rounded-xl border border-[#2D2D2D] px-4 mb-5">
                 {[
                   ['Display Name', 'You'],
-                  ['Email',        'you@company.com'],
+                    ['Email',        'you@example.com'],
                 ].map(([label, value]) => (
                   <SettingRow key={label} label={label}>
                     <input

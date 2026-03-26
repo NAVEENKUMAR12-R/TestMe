@@ -191,27 +191,33 @@ function APIsPanel() {
           <ExternalLink size={13} />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto px-2 space-y-1">
-        {apis.map(api => (
-          <div
-            key={api.id}
-            onClick={() => setActivePage('apis')}
-            className="flex items-start gap-2.5 px-2 py-2 rounded cursor-pointer hover:bg-[#2D2D2D] group transition-colors"
-          >
-            <div className="w-7 h-7 rounded bg-[#6C63FF]/15 flex items-center justify-center shrink-0 mt-0.5">
-              <Code2 size={12} className="text-[#6C63FF]" />
+        <div className="flex-1 overflow-y-auto px-2 space-y-1">
+          {apis.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-32 text-center px-4">
+              <Code2 size={24} className="text-[#3D3D3D] mb-2" />
+              <p className="text-xs text-[#5A5A5A]">No APIs yet</p>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium text-[#CCCCCC] truncate">{api.name}</div>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-[10px] text-[#5A5A5A]">{api.version}</span>
-                <span className="text-[10px] text-[#5A5A5A]">·</span>
-                <span className="text-[10px]" style={{ color: statusColor[api.status] || '#8D8D8D' }}>{api.status}</span>
+          )}
+          {apis.map(api => (
+            <div
+              key={api.id}
+              onClick={() => setActivePage('apis')}
+              className="flex items-start gap-2.5 px-2 py-2 rounded cursor-pointer hover:bg-[#2D2D2D] group transition-colors"
+            >
+              <div className="w-7 h-7 rounded bg-[#6C63FF]/15 flex items-center justify-center shrink-0 mt-0.5">
+                <Code2 size={12} className="text-[#6C63FF]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-[#CCCCCC] truncate">{api.name}</div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[10px] text-[#5A5A5A]">{api.version}</span>
+                  <span className="text-[10px] text-[#5A5A5A]">·</span>
+                  <span className="text-[10px]" style={{ color: statusColor[api.status] || '#8D8D8D' }}>{api.status}</span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
     </div>
   )
 }

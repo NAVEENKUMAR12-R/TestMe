@@ -86,7 +86,7 @@ function ensureStoreShape(data) {
 }
 
 function writeStoreAtomically(store) {
-  const tempPath = `${STORE_PATH}.tmp`;
+  const tempPath = `${STORE_PATH}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tempPath, JSON.stringify(store, null, 2), 'utf8');
   fs.renameSync(tempPath, STORE_PATH);
 }

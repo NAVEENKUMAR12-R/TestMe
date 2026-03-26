@@ -1,6 +1,6 @@
 {
   "projectId": "358d7d58-b6b6-406d-8d07-7357a82dfb98",
-  "createdAt": 1774543785465,
+  "createdAt": 1774544675367,
   "startupCommands": ["cd /home/user/app/backend && npm install && npm run dev; cd /home/user/app/frontend && npm install && npm run dev -- --host 0.0.0.0 --port 5173"],
   "templateId": "any"
 }

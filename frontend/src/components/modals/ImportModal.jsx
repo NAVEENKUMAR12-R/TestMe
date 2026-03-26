@@ -3,8 +3,6 @@ import axios from 'axios'
 import { useApp } from '../../context/AppContext'
 import { X, Upload, Link2, FileJson, Code2, Terminal, Check, AlertCircle } from 'lucide-react'
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001'
-
 const IMPORT_TYPES = [
   { id: 'file', label: 'File', icon: FileJson, desc: 'JSON, YAML, OpenAPI, Swagger' },
   { id: 'url', label: 'URL / Link', icon: Link2, desc: 'Import from a public URL' },
@@ -116,12 +114,13 @@ export default function ImportModal() {
   const handleImport = async () => {
     setImporting(true)
     setResult(null)
-    try {
-      let parsed = null
-      if (importType === 'url' && urlValue.trim()) {
-        const { data } = await axios.get(urlValue.trim())
-        parsed = parseCollectionText(typeof data === 'string' ? data : JSON.stringify(data))
-      } else if (importType === 'curl') {
+      try {
+        let parsed = null
+        if (importType === 'url' && urlValue.trim()) {
+          const { data } = await axios.get(urlValue.trim(), { timeout: 15000 })
+          parsed = parseCollectionText(typeof data === 'string' ? data : JSON.stringify(data))
+        } else if (importType === 'curl') {
+
         parsed = parseCurl(curlText)
       } else {
         parsed = parseCollectionText(rawText)

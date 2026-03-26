@@ -4,20 +4,20 @@
       "id": "ws-default",
       "name": "My Workspace",
       "type": "personal",
-      "description": "Personal API workspace",
       "members": [
         {
           "id": "u-1",
           "name": "You",
-          "email": "you@example.com",
           "role": "owner",
-          "initials": "Y",
           "color": "#FF6C37",
-          "status": "online"
+          "email": "you@example.com",
+          "status": "online",
+          "initials": "Y"
         }
       ],
       "createdAt": "2026-03-26T17:05:57.864Z",
-      "updatedAt": "2026-03-26T17:05:57.864Z"
+      "updatedAt": "2026-03-26T17:05:57.864Z",
+      "description": "Personal API workspace"
     }
   ],
   "collections": [],
@@ -25,12 +25,12 @@
     {
       "version": 1,
       "id": "env-global",
-      "workspaceId": "ws-default",
       "name": "Globals",
       "isGlobal": true,
-      "variables": [],
       "createdAt": "2026-03-26T17:05:57.864Z",
-      "updatedAt": "2026-03-26T17:05:57.864Z"
+      "updatedAt": "2026-03-26T17:05:57.864Z",
+      "variables": [],
+      "workspaceId": "ws-default"
     }
   ],
   "apis": [],

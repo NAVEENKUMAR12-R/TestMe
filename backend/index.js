@@ -7,7 +7,7 @@ const path = require('path');
 const vm = require('vm');
 const https = require('https');
 const { Pool } = require('pg');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -46,6 +46,143 @@ async function runMigrations(db) {
   `);
 
   await db.query(`
+    create table if not exists users (
+      id text primary key,
+      email text not null unique,
+      name text,
+      avatar_url text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+
+  await db.query(`
+    create table if not exists workspaces (
+      id text primary key,
+      name text not null,
+      type text not null default 'personal',
+      description text not null default '',
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+
+  await db.query(`
+    create table if not exists workspace_members (
+      workspace_id text not null references workspaces(id) on delete cascade,
+      user_id text not null references users(id) on delete cascade,
+      role text not null default 'viewer',
+      status text not null default 'online',
+      joined_at timestamptz not null default now(),
+      primary key (workspace_id, user_id)
+    )
+  `);
+
+  await db.query(`
+    create table if not exists collections (
+      id text primary key,
+      workspace_id text not null references workspaces(id) on delete cascade,
+      name text not null,
+      description text not null default '',
+      payload jsonb not null,
+      version bigint not null default 1,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+
+  await db.query(`
+    create table if not exists requests (
+      id text primary key,
+      workspace_id text not null references workspaces(id) on delete cascade,
+      collection_id text references collections(id) on delete set null,
+      name text not null,
+      method text not null default 'GET',
+      url text not null default '',
+      payload jsonb not null,
+      version bigint not null default 1,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+
+  await db.query(`
+    create table if not exists environments (
+      id text primary key,
+      workspace_id text not null references workspaces(id) on delete cascade,
+      name text not null,
+      is_global boolean not null default false,
+      payload jsonb not null,
+      version bigint not null default 1,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+
+  await db.query(`
+    create table if not exists flows (
+      id text primary key,
+      workspace_id text not null references workspaces(id) on delete cascade,
+      name text not null,
+      status text not null default 'draft',
+      payload jsonb not null,
+      version bigint not null default 1,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+
+  await db.query(`
+    create table if not exists mock_servers (
+      id text primary key,
+      workspace_id text not null references workspaces(id) on delete cascade,
+      name text not null,
+      status text not null default 'active',
+      payload jsonb not null,
+      version bigint not null default 1,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+
+  await db.query(`
+    create table if not exists monitors (
+      id text primary key,
+      workspace_id text not null references workspaces(id) on delete cascade,
+      name text not null,
+      status text not null default 'paused',
+      payload jsonb not null,
+      version bigint not null default 1,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+
+  await db.query(`
+    create table if not exists api_definitions (
+      id text primary key,
+      workspace_id text not null references workspaces(id) on delete cascade,
+      name text not null,
+      status text not null default 'active',
+      payload jsonb not null,
+      version bigint not null default 1,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+
+  await db.query(`
+    create table if not exists test_runs (
+      id text primary key,
+      workspace_id text not null references workspaces(id) on delete cascade,
+      request_id text,
+      passed boolean not null,
+      result jsonb not null,
+      created_at timestamptz not null default now()
+    )
+  `);
+
+  await db.query(`
     create table if not exists audit_logs (
       id text primary key,
       workspace_id text,
@@ -60,10 +197,71 @@ async function runMigrations(db) {
   `);
 }
 
+
 async function loadStoreFromDatabase(db) {
   const result = await db.query('select payload from app_store where id = $1 limit 1', [STORE_RECORD_ID]);
   if (!result.rows[0]?.payload) return null;
   return ensureStoreShape(result.rows[0].payload);
+}
+
+async function syncAccessControlToDatabase(store) {
+  if (!pool) return;
+
+  for (const workspace of store.workspaces || []) {
+    await pool.query(
+      `
+        insert into workspaces (id, name, type, description, created_at, updated_at)
+        values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz)
+        on conflict (id)
+        do update set
+          name = excluded.name,
+          type = excluded.type,
+          description = excluded.description,
+          updated_at = excluded.updated_at
+      `,
+      [
+        workspace.id,
+        workspace.name || 'Untitled Workspace',
+        workspace.type || 'personal',
+        workspace.description || '',
+        workspace.createdAt || new Date().toISOString(),
+        workspace.updatedAt || new Date().toISOString(),
+      ],
+    );
+
+    for (const member of workspace.members || []) {
+      await pool.query(
+        `
+          insert into users (id, email, name, avatar_url, created_at, updated_at)
+          values ($1, $2, $3, $4, now(), now())
+          on conflict (id)
+          do update set
+            email = excluded.email,
+            name = excluded.name,
+            avatar_url = excluded.avatar_url,
+            updated_at = now()
+        `,
+        [
+          member.id,
+          member.email || `${member.id}@local.invalid`,
+          member.name || member.email || 'Workspace User',
+          null,
+        ],
+      );
+
+      await pool.query(
+        `
+          insert into workspace_members (workspace_id, user_id, role, status, joined_at)
+          values ($1, $2, $3, $4, now())
+          on conflict (workspace_id, user_id)
+          do update set
+            role = excluded.role,
+            status = excluded.status
+        `,
+        [workspace.id, member.id, member.role || 'viewer', member.status || 'online'],
+      );
+    }
+  }
 }
 
 async function persistStoreToDatabase(store) {
@@ -81,6 +279,7 @@ async function persistStoreToDatabase(store) {
     `,
     [STORE_RECORD_ID, JSON.stringify(payload)],
   );
+  await syncAccessControlToDatabase(payload);
 }
 
 function queuePersist(store) {
@@ -119,6 +318,62 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
+
+async function resolveSupabaseUser(accessToken) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !accessToken) return null;
+
+  const response = await axios.get(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    timeout: 4000,
+  });
+
+  return response.data || null;
+}
+
+app.use(async (req, res, next) => {
+  if (!req.path.startsWith('/api')) {
+    next();
+    return;
+  }
+
+  const authorization = req.header('authorization') || '';
+  const token = authorization.toLowerCase().startsWith('bearer ')
+    ? authorization.slice(7).trim()
+    : '';
+
+  if (!token) {
+    next();
+    return;
+  }
+
+  try {
+    const supabaseUser = await resolveSupabaseUser(token);
+    if (!supabaseUser?.id) {
+      res.status(401).json({ error: 'Invalid Supabase access token' });
+      return;
+    }
+
+    req.user = {
+      id: supabaseUser.id,
+      email: supabaseUser.email || req.header('x-user-email') || `${supabaseUser.id}@local.invalid`,
+      name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'Supabase User',
+      source: 'supabase',
+    };
+
+    next();
+  } catch (error) {
+    const status = error.response?.status;
+    if (status === 401 || status === 403) {
+      res.status(401).json({ error: 'Supabase token rejected' });
+      return;
+    }
+
+    res.status(503).json({ error: 'Supabase auth unavailable', detail: error.message });
+  }
+});
 
 const ROLE_RANK = { viewer: 1, editor: 2, admin: 3, owner: 4 };
 const sseClients = new Set();
@@ -263,9 +518,11 @@ function publishEvent(event, payload) {
 }
 
 function getUser(req) {
-  return {
+  return req.user || {
     id: req.header('x-user-id') || 'u-1',
     email: req.header('x-user-email') || 'you@example.com',
+    name: req.header('x-user-name') || 'You',
+    source: 'headers',
   };
 }
 
@@ -612,6 +869,7 @@ app.get('/api/workspaces', (_req, res) => {
 app.post('/api/workspaces', (req, res) => {
   const store = loadStore();
   const user = getUser(req);
+  const userName = user.name || user.email?.split('@')[0] || 'You';
   const ws = {
     id: createId('ws'),
     name: req.body.name || 'Untitled Workspace',
@@ -620,10 +878,10 @@ app.post('/api/workspaces', (req, res) => {
     members: [
       {
         id: user.id,
-        name: 'You',
+        name: userName,
         email: user.email,
         role: 'owner',
-        initials: 'Y',
+        initials: userName.slice(0, 2).toUpperCase(),
         color: '#FF6C37',
         status: 'online',
       },
@@ -642,6 +900,7 @@ app.post('/api/workspaces', (req, res) => {
     updatedAt: new Date().toISOString(),
   });
   saveStore(store);
+  auditEvent(req, 'workspace.created', ws.id, 'workspace', ws.id, { name: ws.name, type: ws.type });
   publishEvent('workspace.created', { workspaceId: ws.id, workspace: ws });
   res.status(201).json(ws);
 });
@@ -674,6 +933,7 @@ app.post('/api/workspaces/:workspaceId/members', (req, res) => {
   workspace.members.push(member);
   workspace.updatedAt = new Date().toISOString();
   saveStore(store);
+  auditEvent(req, 'workspace.member.invited', workspace.id, 'workspace_member', member.id, { email: member.email, role: member.role });
   publishEvent('workspace.member.invited', { workspaceId: workspace.id, member });
   res.status(201).json(member);
 });
@@ -696,6 +956,7 @@ app.patch('/api/workspaces/:workspaceId/members/:memberId', (req, res) => {
   member.role = role;
   workspace.updatedAt = new Date().toISOString();
   saveStore(store);
+  auditEvent(req, 'workspace.member.updated', workspace.id, 'workspace_member', member.id, { role: member.role });
   publishEvent('workspace.member.updated', { workspaceId: workspace.id, member });
   res.json(member);
 });
@@ -713,6 +974,7 @@ app.delete('/api/workspaces/:workspaceId/members/:memberId', (req, res) => {
   workspace.members = workspace.members.filter((m) => m.id !== req.params.memberId);
   workspace.updatedAt = new Date().toISOString();
   saveStore(store);
+  auditEvent(req, 'workspace.member.removed', workspace.id, 'workspace_member', req.params.memberId, {});
   publishEvent('workspace.member.removed', { workspaceId: workspace.id, memberId: req.params.memberId });
   res.json({ ok: true });
 });
@@ -735,10 +997,11 @@ app.post('/api/collections', (req, res) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    store.collections.push(collection);
-    saveStore(store);
-    publishEvent('collection.created', { workspaceId, collection });
-    res.status(201).json(collection);
+      store.collections.push(collection);
+      saveStore(store);
+      auditEvent(req, 'collection.created', workspaceId, 'collection', collection.id, { name: collection.name });
+      publishEvent('collection.created', { workspaceId, collection });
+      res.status(201).json(collection);
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message, code: error.code });
   }
@@ -759,10 +1022,11 @@ app.patch('/api/collections/:collectionId', (req, res) => {
       expanded: req.body.expanded ?? collection.expanded,
       items: Array.isArray(req.body.items) ? req.body.items : collection.items,
     });
-    bumpEntity(collection);
-    saveStore(store);
-    publishEvent('collection.updated', { workspaceId: collection.workspaceId, collection });
-    res.json(collection);
+      bumpEntity(collection);
+      saveStore(store);
+      auditEvent(req, 'collection.updated', collection.workspaceId, 'collection', collection.id, { name: collection.name, version: collection.version });
+      publishEvent('collection.updated', { workspaceId: collection.workspaceId, collection });
+      res.json(collection);
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message, code: error.code, currentVersion: error.currentVersion });
   }
@@ -777,10 +1041,11 @@ app.delete('/api/collections/:collectionId', (req, res) => {
     ensureEntityAccess(req, workspace, 'editor');
     checkVersion(existing, req.body?.version || req.query.version);
 
-    store.collections = store.collections.filter((c) => c.id !== req.params.collectionId);
-    saveStore(store);
-    publishEvent('collection.deleted', { workspaceId: existing.workspaceId, collectionId: existing.id });
-    res.json({ ok: true });
+      store.collections = store.collections.filter((c) => c.id !== req.params.collectionId);
+      saveStore(store);
+      auditEvent(req, 'collection.deleted', existing.workspaceId, 'collection', existing.id, { name: existing.name });
+      publishEvent('collection.deleted', { workspaceId: existing.workspaceId, collectionId: existing.id });
+      res.json({ ok: true });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message, code: error.code, currentVersion: error.currentVersion });
   }
@@ -802,10 +1067,11 @@ app.post('/api/environments', (req, res) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    store.environments.push(environment);
-    saveStore(store);
-    publishEvent('environment.created', { workspaceId: environment.workspaceId, environment });
-    res.status(201).json(environment);
+      store.environments.push(environment);
+      saveStore(store);
+      auditEvent(req, 'environment.created', environment.workspaceId, 'environment', environment.id, { name: environment.name });
+      publishEvent('environment.created', { workspaceId: environment.workspaceId, environment });
+      res.status(201).json(environment);
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message, code: error.code });
   }
@@ -825,10 +1091,11 @@ app.patch('/api/environments/:environmentId', (req, res) => {
       variables: Array.isArray(req.body.variables) ? req.body.variables : environment.variables,
     });
 
-    bumpEntity(environment);
-    saveStore(store);
-    publishEvent('environment.updated', { workspaceId: environment.workspaceId, environment });
-    res.json(environment);
+      bumpEntity(environment);
+      saveStore(store);
+      auditEvent(req, 'environment.updated', environment.workspaceId, 'environment', environment.id, { name: environment.name, version: environment.version });
+      publishEvent('environment.updated', { workspaceId: environment.workspaceId, environment });
+      res.json(environment);
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message, code: error.code, currentVersion: error.currentVersion });
   }
@@ -851,6 +1118,10 @@ function upsertWorkspaceEntity({ req, res, store, listName, entityId, minRole = 
       };
       store[listName].push(entity);
       saveStore(store);
+      auditEvent(req, `${eventBase}.created`, workspace.id, eventBase, entity.id, {
+        name: entity.name || null,
+        version: entity.version,
+      });
       publishEvent(`${eventBase}.created`, { workspaceId: workspace.id, entity });
       return res.status(201).json(entity);
     }
@@ -863,6 +1134,10 @@ function upsertWorkspaceEntity({ req, res, store, listName, entityId, minRole = 
     Object.assign(entity, req.body);
     bumpEntity(entity);
     saveStore(store);
+    auditEvent(req, `${eventBase}.updated`, workspace.id, eventBase, entity.id, {
+      name: entity.name || null,
+      version: entity.version,
+    });
     publishEvent(`${eventBase}.updated`, { workspaceId: workspace.id, entity });
     return res.json(entity);
   } catch (error) {
@@ -960,9 +1235,14 @@ app.post('/api/runtime/execute', async (req, res) => {
       request: req.body.request,
       disableSslVerification: Boolean(req.body.disableSslVerification),
     });
-    saveStore(store);
-    publishEvent('runtime.request.executed', { workspaceId: req.body.workspaceId, historyEntry: result.historyEntry });
-    res.json(result);
+      saveStore(store);
+      auditEvent(req, 'runtime.request.executed', req.body.workspaceId, 'request', result.historyEntry.id, {
+        method: result.historyEntry.method,
+        status: result.historyEntry.status,
+        url: result.historyEntry.url,
+      });
+      publishEvent('runtime.request.executed', { workspaceId: req.body.workspaceId, historyEntry: result.historyEntry });
+      res.json(result);
   } catch (error) {
     res.status(500).json({ error: 'Runtime execution failed', message: error.message });
   }
@@ -1002,10 +1282,14 @@ app.post('/api/runtime/run-collection', async (req, res) => {
       }
     }
 
-    saveStore(store);
-    publishEvent('runtime.collection.executed', { workspaceId, collectionId: collection.id, runs: runs.length });
+      saveStore(store);
+      auditEvent(req, 'runtime.collection.executed', workspaceId, 'collection', collection.id, {
+        iterations,
+        runs: runs.length,
+      });
+      publishEvent('runtime.collection.executed', { workspaceId, collectionId: collection.id, runs: runs.length });
 
-    res.json({
+      res.json({
       runs,
       summary: {
         total: runs.length,
@@ -1111,14 +1395,18 @@ app.post('/api/collaboration/collections/:collectionId', (req, res) => {
     });
     bumpEntity(collection);
 
-    saveStore(store);
-    publishEvent('collaboration.collection.updated', {
-      workspaceId: workspace.id,
-      collectionId: collection.id,
-      version: collection.version,
-      user: { id: user.id, email: user.email },
-      at: new Date().toISOString(),
-    });
+      saveStore(store);
+      auditEvent(req, 'collaboration.collection.updated', workspace.id, 'collection', collection.id, {
+        version: collection.version,
+        mergeStrategy: 'last-write-wins-with-version-check',
+      });
+      publishEvent('collaboration.collection.updated', {
+        workspaceId: workspace.id,
+        collectionId: collection.id,
+        version: collection.version,
+        user: { id: user.id, email: user.email },
+        at: new Date().toISOString(),
+      });
 
     res.json({
       ok: true,
@@ -1157,9 +1445,10 @@ app.delete('/api/history', (req, res) => {
   } else {
     store.history = [];
   }
-  saveStore(store);
-  publishEvent('history.cleared', { workspaceId: workspaceId || null });
-  res.json({ ok: true });
+    saveStore(store);
+    auditEvent(req, 'history.cleared', workspaceId || null, 'history', workspaceId || 'global', {});
+    publishEvent('history.cleared', { workspaceId: workspaceId || null });
+    res.json({ ok: true });
 });
 
 app.post('/proxy', async (req, res) => {
@@ -1217,7 +1506,14 @@ app.all(/^\/mock\/([^/]+)\/(.*)$/, (req, res) => {
   res.status(Number(route.statusCode || 200)).json(route.responseBody || { ok: true });
 });
 
-app.listen(PORT, () => {
-  loadStore();
-  console.log(`PostFlow backend running on http://localhost:${PORT}`);
-});
+initializePersistence()
+  .then(() => {
+    app.listen(PORT, () => {
+      loadStore();
+      console.log(`PostFlow backend running on http://localhost:${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to initialize persistence:', error.message);
+    process.exit(1);
+  });

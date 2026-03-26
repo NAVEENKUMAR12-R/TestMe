@@ -3,7 +3,41 @@ import axios from 'axios'
 
 const AppContext = createContext(null)
 
-const API_BASE = 'http://localhost:3001'
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3001'
+
+function parseJwtPayload(token) {
+  try {
+    const parts = token.split('.')
+    if (parts.length < 2) return null
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+    return JSON.parse(atob(padded))
+  } catch {
+    return null
+  }
+}
+
+function getSupabaseAccessToken() {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+  const ref = supabaseUrl.replace(/^https?:\/\//, '').split('.')[0]
+  const keys = [
+    ref ? `sb-${ref}-auth-token` : '',
+    'supabase.auth.token',
+  ].filter(Boolean)
+
+  for (const key of keys) {
+    const raw = localStorage.getItem(key)
+    if (!raw) continue
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed?.access_token) return parsed.access_token
+    } catch {
+      // ignore invalid token cache shape
+    }
+  }
+
+  return ''
+}
 
 const blankRow = (prefix) => ({
   id: `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -63,6 +97,31 @@ function flattenRequests(items = [], acc = []) {
 }
 
 export function AppProvider({ children }) {
+  const [supabaseAccessToken, setSupabaseAccessToken] = useState(() => getSupabaseAccessToken())
+  const supabaseUser = useMemo(() => parseJwtPayload(supabaseAccessToken), [supabaseAccessToken])
+
+  const api = useMemo(() => {
+    const instance = axios.create({ baseURL: API_BASE })
+    instance.interceptors.request.use((config) => {
+      const nextConfig = { ...config, headers: { ...(config.headers || {}) } }
+      if (supabaseAccessToken) {
+        nextConfig.headers.Authorization = `Bearer ${supabaseAccessToken}`
+      }
+      if (supabaseUser?.sub) {
+        nextConfig.headers['x-user-id'] = supabaseUser.sub
+      }
+      if (supabaseUser?.email) {
+        nextConfig.headers['x-user-email'] = supabaseUser.email
+      }
+      if (supabaseUser?.email) {
+        const fallbackName = supabaseUser.user_metadata?.name || supabaseUser.email.split('@')[0]
+        nextConfig.headers['x-user-name'] = fallbackName
+      }
+      return nextConfig
+    })
+    return instance
+  }, [supabaseAccessToken, supabaseUser])
+
   const [workspaces, setWorkspaces] = useState([])
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('')
   const [collections, setCollections] = useState([])
@@ -93,7 +152,7 @@ export function AppProvider({ children }) {
   }, [])
 
   const hydrateWorkspace = useCallback(async (workspaceId) => {
-    const { data } = await axios.get(`${API_BASE}/api/bootstrap`, { params: { workspaceId } })
+    const { data } = await api.get(`/api/bootstrap`, { params: { workspaceId } })
     setWorkspaces(data.workspaces || [])
     const ws = data.workspace || data.workspaces?.[0] || null
     if (ws) setActiveWorkspaceId(ws.id)
@@ -108,10 +167,14 @@ export function AppProvider({ children }) {
 
     const preferredEnv = (data.environments || []).find(e => e.isGlobal)?.id || data.environments?.[0]?.id || ''
     setActiveEnvId(preferredEnv)
-  }, [])
+  }, [api])
 
   useEffect(() => {
-    axios.get(`${API_BASE}/api/bootstrap`)
+    const refreshAuthToken = () => setSupabaseAccessToken(getSupabaseAccessToken())
+    window.addEventListener('storage', refreshAuthToken)
+    const tokenInterval = window.setInterval(refreshAuthToken, 5000)
+
+    api.get(`/api/bootstrap`)
       .then(({ data }) => {
         setWorkspaces(data.workspaces || [])
         const ws = data.workspace || data.workspaces?.[0] || null
@@ -131,11 +194,16 @@ export function AppProvider({ children }) {
       .catch((error) => {
         appendConsole({ type: 'error', message: `Failed to load workspace: ${error.message}` })
       })
-  }, [appendConsole])
+
+    return () => {
+      window.removeEventListener('storage', refreshAuthToken)
+      window.clearInterval(tokenInterval)
+    }
+  }, [appendConsole, api])
 
   useEffect(() => {
     if (!activeWorkspaceId) return undefined
-    const source = new EventSource(`${API_BASE}/api/collaboration/events?workspaceId=${activeWorkspaceId}`)
+    const source = new EventSource(`/api/collaboration/events?workspaceId=${activeWorkspaceId}`)
 
     const refreshWorkspace = () => {
       hydrateWorkspace(activeWorkspaceId).catch(() => {})
@@ -252,7 +320,7 @@ export function AppProvider({ children }) {
         },
       }
 
-      const { data } = await axios.post(`${API_BASE}/api/runtime/execute`, payload)
+      const { data } = await api.post(`/api/runtime/execute`, payload)
       setTabs(prev => prev.map(t => (t.id === tabId ? { ...t, response: data.response, tests: data.tests || [], loading: false, error: null } : t)))
       setHistory(prev => [data.historyEntry, ...prev.filter(h => h.id !== data.historyEntry.id)].slice(0, 200))
       appendConsole({
@@ -269,16 +337,16 @@ export function AppProvider({ children }) {
       setTabs(prev => prev.map(t => (t.id === tabId ? { ...t, loading: false, error: message, response: null } : t)))
       appendConsole({ type: 'error', source: 'network', message: `✗ ${message}` })
     }
-  }, [tabs, activeWorkspaceId, activeEnvId, updateTab, appendConsole])
+  }, [api, tabs, activeWorkspaceId, activeEnvId, updateTab, appendConsole])
 
   const persistCollection = useCallback(async (collection) => {
     if (!collection.id || String(collection.id).startsWith('col-temp-')) {
-      const { data } = await axios.post(`${API_BASE}/api/collections`, { ...collection, workspaceId: activeWorkspaceId })
+      const { data } = await api.post(`/api/collections`, { ...collection, workspaceId: activeWorkspaceId })
       return data
     }
-    const { data } = await axios.patch(`${API_BASE}/api/collections/${collection.id}`, collection)
+    const { data } = await api.patch(`/api/collections/${collection.id}`, collection)
     return data
-  }, [activeWorkspaceId])
+  }, [api, activeWorkspaceId])
 
   const addCollection = useCallback(async (name) => {
     const draft = {
@@ -299,13 +367,13 @@ export function AppProvider({ children }) {
     if (!current) return
     setCollections(prev => prev.map(c => (c.id === colId ? { ...c, expanded: !c.expanded } : c)))
     try {
-      const { data } = await axios.patch(`${API_BASE}/api/collections/${colId}`, { expanded: !current.expanded, version: current.version })
+      const { data } = await api.patch(`/api/collections/${colId}`, { expanded: !current.expanded, version: current.version })
       setCollections(prev => prev.map(c => (c.id === colId ? data : c)))
     } catch (error) {
       appendConsole({ type: 'warn', source: 'collaboration', message: `Collection update conflict: ${error.response?.data?.error || error.message}` })
       await hydrateWorkspace(activeWorkspaceId)
     }
-  }, [collections, appendConsole, hydrateWorkspace, activeWorkspaceId])
+  }, [api, collections, appendConsole, hydrateWorkspace, activeWorkspaceId])
 
   const toggleFolderExpand = useCallback((colId, folderId) => {
     setCollections(prev => prev.map(c => {
@@ -323,61 +391,61 @@ export function AppProvider({ children }) {
     const current = environments.find(e => e.id === envId)
     setEnvironments(prev => prev.map(e => (e.id === envId ? { ...e, variables } : e)))
     try {
-      const { data } = await axios.patch(`${API_BASE}/api/environments/${envId}`, { variables, version: current?.version })
+      const { data } = await api.patch(`/api/environments/${envId}`, { variables, version: current?.version })
       setEnvironments(prev => prev.map(e => (e.id === envId ? data : e)))
     } catch (error) {
       appendConsole({ type: 'warn', message: `Failed to persist environment changes: ${error.response?.data?.error || error.message}` })
       await hydrateWorkspace(activeWorkspaceId)
     }
-  }, [appendConsole, environments, activeWorkspaceId, hydrateWorkspace])
+  }, [api, appendConsole, environments, activeWorkspaceId, hydrateWorkspace])
 
   const addEnvironment = useCallback(async (name) => {
     if (!activeWorkspaceId) return
-    const { data } = await axios.post(`${API_BASE}/api/environments`, {
+    const { data } = await api.post(`/api/environments`, {
       workspaceId: activeWorkspaceId,
       name,
       variables: [],
     })
     setEnvironments(prev => [...prev, data])
     setActiveEnvId(data.id)
-  }, [activeWorkspaceId])
+  }, [api, activeWorkspaceId])
 
   const addWorkspace = useCallback(async (name, type) => {
-    const { data } = await axios.post(`${API_BASE}/api/workspaces`, { name, type })
+    const { data } = await api.post(`/api/workspaces`, { name, type })
     setWorkspaces(prev => [...prev, data])
     setActiveWorkspaceId(data.id)
     await hydrateWorkspace(data.id)
-  }, [hydrateWorkspace])
+  }, [api, hydrateWorkspace])
 
   const inviteMember = useCallback(async (wsId, email) => {
-    const { data } = await axios.post(`${API_BASE}/api/workspaces/${wsId}/members`, { email, role: 'viewer' })
+    const { data } = await api.post(`/api/workspaces/${wsId}/members`, { email, role: 'viewer' })
     setWorkspaces(prev => prev.map(ws => (ws.id === wsId ? { ...ws, members: [...ws.members, data] } : ws)))
-  }, [])
+  }, [api])
 
   const updateMemberRole = useCallback(async (wsId, memberId, role) => {
-    const { data } = await axios.patch(`${API_BASE}/api/workspaces/${wsId}/members/${memberId}`, { role })
+    const { data } = await api.patch(`/api/workspaces/${wsId}/members/${memberId}`, { role })
     setWorkspaces(prev => prev.map(ws => ({
       ...ws,
       members: ws.id === wsId ? ws.members.map(m => (m.id === memberId ? data : m)) : ws.members,
     })))
-  }, [])
+  }, [api])
 
   const removeMember = useCallback(async (wsId, memberId) => {
-    await axios.delete(`${API_BASE}/api/workspaces/${wsId}/members/${memberId}`)
+    await api.delete(`/api/workspaces/${wsId}/members/${memberId}`)
     setWorkspaces(prev => prev.map(ws => ({
       ...ws,
       members: ws.id === wsId ? ws.members.filter(m => m.id !== memberId) : ws.members,
     })))
-  }, [])
+  }, [api])
 
   const clearHistory = useCallback(async () => {
     if (!activeWorkspaceId) return
-    await axios.delete(`${API_BASE}/api/history`, { params: { workspaceId: activeWorkspaceId } })
+    await api.delete(`/api/history`, { params: { workspaceId: activeWorkspaceId } })
     setHistory([])
-  }, [activeWorkspaceId])
+  }, [api, activeWorkspaceId])
 
   const runCollection = useCallback(async ({ collectionId, iterations, delayMs, environmentId }) => {
-    const { data } = await axios.post(`${API_BASE}/api/runtime/run-collection`, {
+    const { data } = await api.post(`/api/runtime/run-collection`, {
       workspaceId: activeWorkspaceId,
       collectionId,
       iterations,
@@ -385,37 +453,37 @@ export function AppProvider({ children }) {
       environmentId,
       disableSslVerification: false,
     })
-    await axios.get(`${API_BASE}/api/history`, { params: { workspaceId: activeWorkspaceId } }).then((res) => setHistory(res.data || []))
+    await api.get(`/api/history`, { params: { workspaceId: activeWorkspaceId } }).then((res) => setHistory(res.data || []))
     return data
-  }, [activeWorkspaceId])
+  }, [api, activeWorkspaceId])
 
   const createApi = useCallback(async (payload = {}) => {
     if (!activeWorkspaceId) return null
-    const { data } = await axios.post(`${API_BASE}/api/apis`, { workspaceId: activeWorkspaceId, ...payload })
+    const { data } = await api.post(`/api/apis`, { workspaceId: activeWorkspaceId, ...payload })
     setApis(prev => [...prev, data])
     return data
-  }, [activeWorkspaceId])
+  }, [api, activeWorkspaceId])
 
   const createFlow = useCallback(async (payload = {}) => {
     if (!activeWorkspaceId) return null
-    const { data } = await axios.post(`${API_BASE}/api/flows`, { workspaceId: activeWorkspaceId, ...payload })
+    const { data } = await api.post(`/api/flows`, { workspaceId: activeWorkspaceId, ...payload })
     setFlows(prev => [...prev, data])
     return data
-  }, [activeWorkspaceId])
+  }, [api, activeWorkspaceId])
 
   const createMockServer = useCallback(async (payload = {}) => {
     if (!activeWorkspaceId) return null
-    const { data } = await axios.post(`${API_BASE}/api/mock-servers`, { workspaceId: activeWorkspaceId, ...payload })
+    const { data } = await api.post(`/api/mock-servers`, { workspaceId: activeWorkspaceId, ...payload })
     setMockServers(prev => [...prev, data])
     return data
-  }, [activeWorkspaceId])
+  }, [api, activeWorkspaceId])
 
   const createMonitor = useCallback(async (payload = {}) => {
     if (!activeWorkspaceId) return null
-    const { data } = await axios.post(`${API_BASE}/api/monitors`, { workspaceId: activeWorkspaceId, ...payload })
+    const { data } = await api.post(`/api/monitors`, { workspaceId: activeWorkspaceId, ...payload })
     setMonitors(prev => [...prev, data])
     return data
-  }, [activeWorkspaceId])
+  }, [api, activeWorkspaceId])
 
   const importCollection = useCallback(async ({ name, items }) => {
     const collection = {
@@ -425,10 +493,10 @@ export function AppProvider({ children }) {
       expanded: true,
       items,
     }
-    const { data } = await axios.post(`${API_BASE}/api/collections`, collection)
+    const { data } = await api.post(`/api/collections`, collection)
     setCollections(prev => [...prev, data])
     return data
-  }, [activeWorkspaceId])
+  }, [api, activeWorkspaceId])
 
   const openModal = useCallback((name) => setModals(prev => ({ ...prev, [name]: true })), [])
   const closeModal = useCallback((name) => setModals(prev => ({ ...prev, [name]: false })), [])

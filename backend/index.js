@@ -17,10 +17,103 @@ const DATABASE_URL = process.env.DATABASE_URL || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const STORE_RECORD_ID = 'global';
 
 let pool = null;
 let storeCache = null;
 let persistQueue = Promise.resolve();
+
+function cloneStore(store) {
+  return JSON.parse(JSON.stringify(store));
+}
+
+function createPoolIfPossible() {
+  if (!DATABASE_URL) return null;
+  return new Pool({
+    connectionString: DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
+}
+
+async function runMigrations(db) {
+  await db.query(`
+    create table if not exists app_store (
+      id text primary key,
+      payload jsonb not null,
+      version bigint not null default 1,
+      updated_at timestamptz not null default now()
+    )
+  `);
+
+  await db.query(`
+    create table if not exists audit_logs (
+      id text primary key,
+      workspace_id text,
+      user_id text,
+      user_email text,
+      event text not null,
+      entity_type text,
+      entity_id text,
+      metadata jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now()
+    )
+  `);
+}
+
+async function loadStoreFromDatabase(db) {
+  const result = await db.query('select payload from app_store where id = $1 limit 1', [STORE_RECORD_ID]);
+  if (!result.rows[0]?.payload) return null;
+  return ensureStoreShape(result.rows[0].payload);
+}
+
+async function persistStoreToDatabase(store) {
+  if (!pool) return;
+  const payload = ensureStoreShape(store);
+  await pool.query(
+    `
+      insert into app_store (id, payload, version, updated_at)
+      values ($1, $2::jsonb, 1, now())
+      on conflict (id)
+      do update set
+        payload = excluded.payload,
+        version = app_store.version + 1,
+        updated_at = now()
+    `,
+    [STORE_RECORD_ID, JSON.stringify(payload)],
+  );
+}
+
+function queuePersist(store) {
+  if (!pool) return;
+  persistQueue = persistQueue
+    .then(() => persistStoreToDatabase(store))
+    .catch((error) => {
+      console.error('Database persist failed:', error.message);
+    });
+}
+
+function auditEvent(req, event, workspaceId, entityType, entityId, metadata = {}) {
+  if (!pool) return;
+  const user = getUser(req);
+  const payload = {
+    workspaceId,
+    entityType,
+    entityId,
+    metadata,
+  };
+
+  persistQueue = persistQueue
+    .then(() => pool.query(
+      `
+        insert into audit_logs (id, workspace_id, user_id, user_email, event, entity_type, entity_id, metadata)
+        values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+      `,
+      [createId('audit'), workspaceId || null, user.id, user.email, event, entityType || null, entityId || null, JSON.stringify(payload)],
+    ))
+    .catch((error) => {
+      console.error('Audit log persist failed:', error.message);
+    });
+}
 
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
@@ -100,7 +193,7 @@ function writeStoreAtomically(store) {
   fs.renameSync(tempPath, STORE_PATH);
 }
 
-function loadStore() {
+function loadStoreFromFile() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(STORE_PATH)) {
     const seeded = defaultStore();
@@ -122,8 +215,46 @@ function loadStore() {
   }
 }
 
+function loadStore() {
+  if (!storeCache) {
+    storeCache = loadStoreFromFile();
+  }
+  return cloneStore(storeCache);
+}
+
 function saveStore(store) {
-  writeStoreAtomically(store);
+  const normalized = ensureStoreShape(store);
+  storeCache = normalized;
+  writeStoreAtomically(normalized);
+  queuePersist(normalized);
+}
+
+async function initializePersistence() {
+  let seededFromDb = false;
+  pool = createPoolIfPossible();
+  if (pool) {
+    await runMigrations(pool);
+    const dbStore = await loadStoreFromDatabase(pool);
+    if (dbStore) {
+      storeCache = dbStore;
+      writeStoreAtomically(dbStore);
+      seededFromDb = true;
+      console.log('Persistence mode: Supabase PostgreSQL (loaded existing state)');
+    } else {
+      console.log('Persistence mode: Supabase PostgreSQL (empty, will seed from local store)');
+    }
+  }
+
+  if (!seededFromDb) {
+    const fileStore = loadStoreFromFile();
+    storeCache = fileStore;
+    if (pool) {
+      await persistStoreToDatabase(fileStore);
+      console.log('Seeded Supabase app_store from local store.json');
+    } else {
+      console.log('Persistence mode: local file store.json');
+    }
+  }
 }
 
 function publishEvent(event, payload) {

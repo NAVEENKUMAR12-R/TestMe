@@ -192,8 +192,25 @@ function MonitorDetail({ monitor, onClose }) {
 }
 
 export default function MonitorsPage() {
-  const { monitors, activeWorkspaceId } = useApp()
+  const { monitors, activeWorkspaceId, createMonitor } = useApp()
   const [selectedMonitor, setSelectedMonitor] = useState(null)
+
+  const handleCreateMonitor = async () => {
+    const monitor = await createMonitor({
+      name: `Monitor ${monitors.length + 1}`,
+      status: 'paused',
+      schedule: '*/5 * * * *',
+      region: 'us-east-1',
+      uptime: 100,
+      totalRuns: 0,
+      failedRuns: 0,
+      avgResponseTime: 0,
+      lastRun: 'never',
+      lastFailure: 'Never',
+      recentRuns: [],
+    })
+    if (monitor) setSelectedMonitor(monitor)
+  }
 
   const wsMonitors = monitors.filter(m => m.workspaceId === activeWorkspaceId)
 
@@ -213,9 +230,13 @@ export default function MonitorsPage() {
             <h1 className="text-xl font-bold text-white mb-1">Monitors</h1>
             <p className="text-sm text-[#8D8D8D]">Schedule automated API health checks and get alerted on failures</p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors">
-            <Plus size={13} /> New Monitor
-          </button>
+            <button
+              onClick={handleCreateMonitor}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors"
+            >
+              <Plus size={13} /> New Monitor
+            </button>
+
         </div>
 
         {/* Overall status banner */}

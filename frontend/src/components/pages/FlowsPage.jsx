@@ -250,9 +250,23 @@ function FlowBuilder({ flow, onClose }) {
 }
 
 export default function FlowsPage() {
-  const { flows, activeWorkspaceId } = useApp()
+  const { flows, activeWorkspaceId, createFlow } = useApp()
   const [selectedFlow, setSelectedFlow] = useState(null)
   const wsFlows = flows.filter(f => f.workspaceId === activeWorkspaceId)
+
+  const handleCreateFlow = async () => {
+    const flow = await createFlow({
+      name: `Flow ${wsFlows.length + 1}`,
+      description: 'Automated workflow',
+      status: 'draft',
+      nodes: [
+        { id: `node-${Date.now()}`, type: 'request', label: 'Request Step', method: 'GET' },
+      ],
+      totalRuns: 0,
+      lastRun: 'never',
+    })
+    if (flow) setSelectedFlow(flow)
+  }
 
   if (selectedFlow) {
     return <FlowBuilder flow={selectedFlow} onClose={() => setSelectedFlow(null)} />
@@ -267,9 +281,13 @@ export default function FlowsPage() {
             <h1 className="text-xl font-bold text-white mb-1">Flows</h1>
             <p className="text-sm text-[#8D8D8D]">Build and automate multi-step API workflows visually</p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors">
-            <Plus size={13} /> New Flow
-          </button>
+            <button
+              onClick={handleCreateFlow}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors"
+            >
+              <Plus size={13} /> New Flow
+            </button>
+
         </div>
 
         {/* Stats row */}
@@ -295,9 +313,13 @@ export default function FlowsPage() {
             </div>
             <p className="text-sm font-medium text-[#CCCCCC] mb-1">No flows yet</p>
             <p className="text-xs text-[#5A5A5A]">Create a flow to automate multi-step API workflows</p>
-            <button className="mt-4 flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors">
-              <Plus size={13} /> Create First Flow
-            </button>
+              <button
+                onClick={handleCreateFlow}
+                className="mt-4 flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors"
+              >
+                <Plus size={13} /> Create First Flow
+              </button>
+
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

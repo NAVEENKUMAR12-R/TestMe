@@ -23,6 +23,7 @@
   "collections": [],
   "environments": [
     {
+      "version": 1,
       "id": "env-global",
       "workspaceId": "ws-default",
       "name": "Globals",

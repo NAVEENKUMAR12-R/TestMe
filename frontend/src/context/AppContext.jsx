@@ -119,14 +119,39 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (!activeWorkspaceId) return undefined
     const source = new EventSource(`${API_BASE}/api/collaboration/events?workspaceId=${activeWorkspaceId}`)
-    source.addEventListener('runtime.request.executed', () => {
-      axios.get(`${API_BASE}/api/history`, { params: { workspaceId: activeWorkspaceId } })
-        .then(({ data }) => setHistory(data || []))
-        .catch(() => {})
-    })
+
+    const refreshWorkspace = () => {
+      hydrateWorkspace(activeWorkspaceId).catch(() => {})
+    }
+
+    const eventNames = [
+      'runtime.request.executed',
+      'runtime.collection.executed',
+      'collection.created',
+      'collection.updated',
+      'collection.deleted',
+      'environment.created',
+      'environment.updated',
+      'api.created',
+      'api.updated',
+      'flow.created',
+      'flow.updated',
+      'mock-server.created',
+      'mock-server.updated',
+      'monitor.created',
+      'monitor.updated',
+      'collaboration.collection.updated',
+      'history.cleared',
+    ]
+
+    eventNames.forEach((eventName) => source.addEventListener(eventName, refreshWorkspace))
     source.onerror = () => {}
-    return () => source.close()
-  }, [activeWorkspaceId])
+
+    return () => {
+      eventNames.forEach((eventName) => source.removeEventListener(eventName, refreshWorkspace))
+      source.close()
+    }
+  }, [activeWorkspaceId, hydrateWorkspace])
 
   const addTab = useCallback((overrides = {}) => {
     const tab = newTab({ id: `tab-${tabCounter.current++}`, ...overrides })
@@ -249,11 +274,21 @@ export function AppProvider({ children }) {
     }
     const saved = await persistCollection(draft)
     setCollections(prev => [...prev, saved])
+    return saved
   }, [activeWorkspaceId, persistCollection])
 
-  const toggleCollectionExpand = useCallback((colId) => {
+  const toggleCollectionExpand = useCallback(async (colId) => {
+    const current = collections.find(c => c.id === colId)
+    if (!current) return
     setCollections(prev => prev.map(c => (c.id === colId ? { ...c, expanded: !c.expanded } : c)))
-  }, [])
+    try {
+      const { data } = await axios.patch(`${API_BASE}/api/collections/${colId}`, { expanded: !current.expanded, version: current.version })
+      setCollections(prev => prev.map(c => (c.id === colId ? data : c)))
+    } catch (error) {
+      appendConsole({ type: 'warn', source: 'collaboration', message: `Collection update conflict: ${error.response?.data?.error || error.message}` })
+      await hydrateWorkspace(activeWorkspaceId)
+    }
+  }, [collections, appendConsole, hydrateWorkspace, activeWorkspaceId])
 
   const toggleFolderExpand = useCallback((colId, folderId) => {
     setCollections(prev => prev.map(c => {
@@ -268,14 +303,16 @@ export function AppProvider({ children }) {
   }, [])
 
   const updateEnvironment = useCallback(async (envId, variables) => {
+    const current = environments.find(e => e.id === envId)
     setEnvironments(prev => prev.map(e => (e.id === envId ? { ...e, variables } : e)))
     try {
-      const { data } = await axios.patch(`${API_BASE}/api/environments/${envId}`, { variables })
+      const { data } = await axios.patch(`${API_BASE}/api/environments/${envId}`, { variables, version: current?.version })
       setEnvironments(prev => prev.map(e => (e.id === envId ? data : e)))
-    } catch {
-      appendConsole({ type: 'warn', message: 'Failed to persist environment changes' })
+    } catch (error) {
+      appendConsole({ type: 'warn', message: `Failed to persist environment changes: ${error.response?.data?.error || error.message}` })
+      await hydrateWorkspace(activeWorkspaceId)
     }
-  }, [appendConsole])
+  }, [appendConsole, environments, activeWorkspaceId, hydrateWorkspace])
 
   const addEnvironment = useCallback(async (name) => {
     if (!activeWorkspaceId) return
@@ -332,6 +369,34 @@ export function AppProvider({ children }) {
       disableSslVerification: false,
     })
     await axios.get(`${API_BASE}/api/history`, { params: { workspaceId: activeWorkspaceId } }).then((res) => setHistory(res.data || []))
+    return data
+  }, [activeWorkspaceId])
+
+  const createApi = useCallback(async (payload = {}) => {
+    if (!activeWorkspaceId) return null
+    const { data } = await axios.post(`${API_BASE}/api/apis`, { workspaceId: activeWorkspaceId, ...payload })
+    setApis(prev => [...prev, data])
+    return data
+  }, [activeWorkspaceId])
+
+  const createFlow = useCallback(async (payload = {}) => {
+    if (!activeWorkspaceId) return null
+    const { data } = await axios.post(`${API_BASE}/api/flows`, { workspaceId: activeWorkspaceId, ...payload })
+    setFlows(prev => [...prev, data])
+    return data
+  }, [activeWorkspaceId])
+
+  const createMockServer = useCallback(async (payload = {}) => {
+    if (!activeWorkspaceId) return null
+    const { data } = await axios.post(`${API_BASE}/api/mock-servers`, { workspaceId: activeWorkspaceId, ...payload })
+    setMockServers(prev => [...prev, data])
+    return data
+  }, [activeWorkspaceId])
+
+  const createMonitor = useCallback(async (payload = {}) => {
+    if (!activeWorkspaceId) return null
+    const { data } = await axios.post(`${API_BASE}/api/monitors`, { workspaceId: activeWorkspaceId, ...payload })
+    setMonitors(prev => [...prev, data])
     return data
   }, [activeWorkspaceId])
 
@@ -399,9 +464,14 @@ export function AppProvider({ children }) {
         updateMemberRole,
         removeMember,
         clearHistory,
-        runCollection,
-        importCollection,
-        flattenRequests,
+          runCollection,
+          createApi,
+          createFlow,
+          createMockServer,
+          createMonitor,
+          importCollection,
+          flattenRequests,
+
       }}
     >
       {children}

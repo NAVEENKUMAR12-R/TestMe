@@ -198,8 +198,24 @@ function MockDetail({ server, onClose }) {
 }
 
 export default function MockServersPage() {
-  const { mockServers, activeWorkspaceId } = useApp()
+  const { mockServers, activeWorkspaceId, createMockServer } = useApp()
   const [selectedServer, setSelectedServer] = useState(null)
+
+  const handleCreateMockServer = async () => {
+    const mock = await createMockServer({
+      name: `Mock Server ${mockServers.length + 1}`,
+      status: 'active',
+      isPublic: false,
+      baseUrl: `https://mock-${Date.now()}.postflow.local`,
+      routes: [{ method: 'GET', path: '/health', statusCode: 200, responseTime: 40 }],
+      calls: 0,
+      callsLimit: 100000,
+      errorRate: 0,
+      environment: 'default',
+      createdAt: 'just now',
+    })
+    if (mock) setSelectedServer(mock)
+  }
 
   const wsMocks = mockServers.filter(m => m.workspaceId === activeWorkspaceId)
 
@@ -215,9 +231,13 @@ export default function MockServersPage() {
             <h1 className="text-xl font-bold text-white mb-1">Mock Servers</h1>
             <p className="text-sm text-[#8D8D8D]">Simulate API endpoints for testing without a live backend</p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors">
-            <Plus size={13} /> New Mock Server
-          </button>
+            <button
+              onClick={handleCreateMockServer}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors"
+            >
+              <Plus size={13} /> New Mock Server
+            </button>
+
         </div>
 
         {/* Stats */}

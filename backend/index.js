@@ -72,14 +72,15 @@ function defaultStore() {
 
 function ensureStoreShape(data) {
   const fallback = defaultStore();
+  const withVersion = (entity) => ({ version: 1, ...entity, version: Number(entity?.version || 1) });
   return {
     workspaces: Array.isArray(data?.workspaces) ? data.workspaces : fallback.workspaces,
-    collections: Array.isArray(data?.collections) ? data.collections : [],
-    environments: Array.isArray(data?.environments) ? data.environments : fallback.environments,
-    apis: Array.isArray(data?.apis) ? data.apis : [],
-    flows: Array.isArray(data?.flows) ? data.flows : [],
-    mockServers: Array.isArray(data?.mockServers) ? data.mockServers : [],
-    monitors: Array.isArray(data?.monitors) ? data.monitors : [],
+    collections: Array.isArray(data?.collections) ? data.collections.map(withVersion) : [],
+    environments: Array.isArray(data?.environments) ? data.environments.map(withVersion) : fallback.environments,
+    apis: Array.isArray(data?.apis) ? data.apis.map(withVersion) : [],
+    flows: Array.isArray(data?.flows) ? data.flows.map(withVersion) : [],
+    mockServers: Array.isArray(data?.mockServers) ? data.mockServers.map(withVersion) : [],
+    monitors: Array.isArray(data?.monitors) ? data.monitors.map(withVersion) : [],
     history: Array.isArray(data?.history) ? data.history : [],
   };
 }
@@ -117,6 +118,44 @@ function canAccess(workspace, userId, minimumRole = 'viewer') {
   const member = workspace.members.find((m) => m.id === userId);
   if (!member) return false;
   return (ROLE_RANK[member.role] || 0) >= (ROLE_RANK[minimumRole] || 1);
+}
+
+function ensureEntityAccess(req, workspace, minimumRole = 'viewer') {
+  const user = getUser(req);
+  if (!canAccess(workspace, user.id, minimumRole)) {
+    const error = new Error('Insufficient role');
+    error.status = 403;
+    throw error;
+  }
+  return user;
+}
+
+function requireWorkspace(store, workspaceId) {
+  const workspace = store.workspaces.find((w) => w.id === workspaceId);
+  if (!workspace) {
+    const error = new Error('Workspace not found');
+    error.status = 404;
+    throw error;
+  }
+  return workspace;
+}
+
+function checkVersion(entity, expectedVersion) {
+  if (expectedVersion === undefined || expectedVersion === null) return;
+  const normalized = Number(expectedVersion);
+  if (!Number.isFinite(normalized)) return;
+  if (Number(entity.version || 1) !== normalized) {
+    const error = new Error('Version conflict detected');
+    error.status = 409;
+    error.code = 'version_conflict';
+    error.currentVersion = Number(entity.version || 1);
+    throw error;
+  }
+}
+
+function bumpEntity(entity) {
+  entity.version = Number(entity.version || 1) + 1;
+  entity.updatedAt = new Date().toISOString();
 }
 
 function resolveTextVariables(input, variableMap, depth = 0) {
@@ -524,82 +563,236 @@ app.delete('/api/workspaces/:workspaceId/members/:memberId', (req, res) => {
 });
 
 app.post('/api/collections', (req, res) => {
-  const store = loadStore();
-  const workspaceId = req.body.workspaceId;
-  const collection = {
-    id: createId('col'),
-    workspaceId,
-    name: req.body.name || 'New Collection',
-    description: req.body.description || '',
-    expanded: true,
-    items: Array.isArray(req.body.items) ? req.body.items : [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  store.collections.push(collection);
-  saveStore(store);
-  publishEvent('collection.created', { workspaceId, collection });
-  res.status(201).json(collection);
+  try {
+    const store = loadStore();
+    const workspaceId = req.body.workspaceId;
+    const workspace = requireWorkspace(store, workspaceId);
+    ensureEntityAccess(req, workspace, 'editor');
+
+    const collection = {
+      id: createId('col'),
+      workspaceId,
+      name: req.body.name || 'New Collection',
+      description: req.body.description || '',
+      expanded: true,
+      items: Array.isArray(req.body.items) ? req.body.items : [],
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    store.collections.push(collection);
+    saveStore(store);
+    publishEvent('collection.created', { workspaceId, collection });
+    res.status(201).json(collection);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message, code: error.code });
+  }
 });
 
 app.patch('/api/collections/:collectionId', (req, res) => {
-  const store = loadStore();
-  const collection = store.collections.find((c) => c.id === req.params.collectionId);
-  if (!collection) return res.status(404).json({ error: 'Collection not found' });
+  try {
+    const store = loadStore();
+    const collection = store.collections.find((c) => c.id === req.params.collectionId);
+    if (!collection) return res.status(404).json({ error: 'Collection not found' });
+    const workspace = requireWorkspace(store, collection.workspaceId);
+    ensureEntityAccess(req, workspace, 'editor');
+    checkVersion(collection, req.body.version);
 
-  Object.assign(collection, {
-    name: req.body.name ?? collection.name,
-    description: req.body.description ?? collection.description,
-    expanded: req.body.expanded ?? collection.expanded,
-    items: Array.isArray(req.body.items) ? req.body.items : collection.items,
-    updatedAt: new Date().toISOString(),
-  });
-  saveStore(store);
-  publishEvent('collection.updated', { workspaceId: collection.workspaceId, collection });
-  res.json(collection);
+    Object.assign(collection, {
+      name: req.body.name ?? collection.name,
+      description: req.body.description ?? collection.description,
+      expanded: req.body.expanded ?? collection.expanded,
+      items: Array.isArray(req.body.items) ? req.body.items : collection.items,
+    });
+    bumpEntity(collection);
+    saveStore(store);
+    publishEvent('collection.updated', { workspaceId: collection.workspaceId, collection });
+    res.json(collection);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message, code: error.code, currentVersion: error.currentVersion });
+  }
 });
 
 app.delete('/api/collections/:collectionId', (req, res) => {
-  const store = loadStore();
-  const existing = store.collections.find((c) => c.id === req.params.collectionId);
-  if (!existing) return res.status(404).json({ error: 'Collection not found' });
-  store.collections = store.collections.filter((c) => c.id !== req.params.collectionId);
-  saveStore(store);
-  publishEvent('collection.deleted', { workspaceId: existing.workspaceId, collectionId: existing.id });
-  res.json({ ok: true });
+  try {
+    const store = loadStore();
+    const existing = store.collections.find((c) => c.id === req.params.collectionId);
+    if (!existing) return res.status(404).json({ error: 'Collection not found' });
+    const workspace = requireWorkspace(store, existing.workspaceId);
+    ensureEntityAccess(req, workspace, 'editor');
+    checkVersion(existing, req.body?.version || req.query.version);
+
+    store.collections = store.collections.filter((c) => c.id !== req.params.collectionId);
+    saveStore(store);
+    publishEvent('collection.deleted', { workspaceId: existing.workspaceId, collectionId: existing.id });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message, code: error.code, currentVersion: error.currentVersion });
+  }
 });
 
 app.post('/api/environments', (req, res) => {
-  const store = loadStore();
-  const environment = {
-    id: createId('env'),
-    workspaceId: req.body.workspaceId,
-    name: req.body.name || 'New Environment',
-    isGlobal: false,
-    variables: Array.isArray(req.body.variables) ? req.body.variables : [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  store.environments.push(environment);
-  saveStore(store);
-  publishEvent('environment.created', { workspaceId: environment.workspaceId, environment });
-  res.status(201).json(environment);
+  try {
+    const store = loadStore();
+    const workspace = requireWorkspace(store, req.body.workspaceId);
+    ensureEntityAccess(req, workspace, 'editor');
+
+    const environment = {
+      id: createId('env'),
+      workspaceId: req.body.workspaceId,
+      name: req.body.name || 'New Environment',
+      isGlobal: false,
+      variables: Array.isArray(req.body.variables) ? req.body.variables : [],
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    store.environments.push(environment);
+    saveStore(store);
+    publishEvent('environment.created', { workspaceId: environment.workspaceId, environment });
+    res.status(201).json(environment);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message, code: error.code });
+  }
 });
 
 app.patch('/api/environments/:environmentId', (req, res) => {
+  try {
+    const store = loadStore();
+    const environment = store.environments.find((e) => e.id === req.params.environmentId);
+    if (!environment) return res.status(404).json({ error: 'Environment not found' });
+    const workspace = requireWorkspace(store, environment.workspaceId);
+    ensureEntityAccess(req, workspace, 'editor');
+    checkVersion(environment, req.body.version);
+
+    Object.assign(environment, {
+      name: req.body.name ?? environment.name,
+      variables: Array.isArray(req.body.variables) ? req.body.variables : environment.variables,
+    });
+
+    bumpEntity(environment);
+    saveStore(store);
+    publishEvent('environment.updated', { workspaceId: environment.workspaceId, environment });
+    res.json(environment);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message, code: error.code, currentVersion: error.currentVersion });
+  }
+});
+
+function upsertWorkspaceEntity({ req, res, store, listName, entityId, minRole = 'editor', defaults = {}, eventBase }) {
+  try {
+    const isCreate = !entityId;
+    if (isCreate) {
+      const workspace = requireWorkspace(store, req.body.workspaceId);
+      ensureEntityAccess(req, workspace, minRole);
+      const entity = {
+        id: createId(defaults.idPrefix || 'ent'),
+        workspaceId: workspace.id,
+        ...defaults,
+        ...req.body,
+        version: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      store[listName].push(entity);
+      saveStore(store);
+      publishEvent(`${eventBase}.created`, { workspaceId: workspace.id, entity });
+      return res.status(201).json(entity);
+    }
+
+    const entity = store[listName].find((item) => item.id === entityId);
+    if (!entity) return res.status(404).json({ error: `${eventBase} not found` });
+    const workspace = requireWorkspace(store, entity.workspaceId);
+    ensureEntityAccess(req, workspace, minRole);
+    checkVersion(entity, req.body.version);
+    Object.assign(entity, req.body);
+    bumpEntity(entity);
+    saveStore(store);
+    publishEvent(`${eventBase}.updated`, { workspaceId: workspace.id, entity });
+    return res.json(entity);
+  } catch (error) {
+    return res.status(error.status || 500).json({ error: error.message, code: error.code, currentVersion: error.currentVersion });
+  }
+}
+
+app.post('/api/apis', (req, res) => {
   const store = loadStore();
-  const environment = store.environments.find((e) => e.id === req.params.environmentId);
-  if (!environment) return res.status(404).json({ error: 'Environment not found' });
-
-  Object.assign(environment, {
-    name: req.body.name ?? environment.name,
-    variables: Array.isArray(req.body.variables) ? req.body.variables : environment.variables,
-    updatedAt: new Date().toISOString(),
+  return upsertWorkspaceEntity({
+    req,
+    res,
+    store,
+    listName: 'apis',
+    defaults: {
+      idPrefix: 'api',
+      name: 'New API',
+      description: '',
+      type: 'REST',
+      schemaType: 'OpenAPI 3.1',
+      status: 'active',
+      endpoints: 0,
+      tests: 0,
+      monitors: 0,
+      versionLabel: 'v1.0.0',
+      lastUpdated: 'just now',
+    },
+    eventBase: 'api',
   });
+});
 
-  saveStore(store);
-  publishEvent('environment.updated', { workspaceId: environment.workspaceId, environment });
-  res.json(environment);
+app.patch('/api/apis/:apiId', (req, res) => {
+  const store = loadStore();
+  return upsertWorkspaceEntity({ req, res, store, listName: 'apis', entityId: req.params.apiId, eventBase: 'api' });
+});
+
+app.post('/api/flows', (req, res) => {
+  const store = loadStore();
+  return upsertWorkspaceEntity({
+    req,
+    res,
+    store,
+    listName: 'flows',
+    defaults: { idPrefix: 'flow', name: 'New Flow', description: '', status: 'draft', nodes: [], totalRuns: 0, lastRun: 'never' },
+    eventBase: 'flow',
+  });
+});
+
+app.patch('/api/flows/:flowId', (req, res) => {
+  const store = loadStore();
+  return upsertWorkspaceEntity({ req, res, store, listName: 'flows', entityId: req.params.flowId, eventBase: 'flow' });
+});
+
+app.post('/api/mock-servers', (req, res) => {
+  const store = loadStore();
+  return upsertWorkspaceEntity({
+    req,
+    res,
+    store,
+    listName: 'mockServers',
+    defaults: { idPrefix: 'mock', name: 'New Mock Server', status: 'active', isPublic: false, baseUrl: '', routes: [], calls: 0, callsLimit: 100000, errorRate: 0, environment: 'default' },
+    eventBase: 'mock-server',
+  });
+});
+
+app.patch('/api/mock-servers/:mockServerId', (req, res) => {
+  const store = loadStore();
+  return upsertWorkspaceEntity({ req, res, store, listName: 'mockServers', entityId: req.params.mockServerId, eventBase: 'mock-server' });
+});
+
+app.post('/api/monitors', (req, res) => {
+  const store = loadStore();
+  return upsertWorkspaceEntity({
+    req,
+    res,
+    store,
+    listName: 'monitors',
+    defaults: { idPrefix: 'mon', name: 'New Monitor', status: 'paused', schedule: '*/5 * * * *', region: 'us-east-1', uptime: 100, totalRuns: 0, failedRuns: 0, avgResponseTime: 0, lastRun: 'never', lastFailure: 'Never', recentRuns: [] },
+    eventBase: 'monitor',
+  });
+});
+
+app.patch('/api/monitors/:monitorId', (req, res) => {
+  const store = loadStore();
+  return upsertWorkspaceEntity({ req, res, store, listName: 'monitors', entityId: req.params.monitorId, eventBase: 'monitor' });
 });
 
 app.post('/api/runtime/execute', async (req, res) => {
@@ -744,6 +937,49 @@ app.get('/api/collaboration/events', (req, res) => {
   res.write(`event: connected\ndata: ${JSON.stringify({ workspaceId, time: new Date().toISOString() })}\n\n`);
   sseClients.add(res);
   req.on('close', () => sseClients.delete(res));
+});
+
+app.post('/api/collaboration/collections/:collectionId', (req, res) => {
+  try {
+    const store = loadStore();
+    const collection = store.collections.find((c) => c.id === req.params.collectionId);
+    if (!collection) return res.status(404).json({ error: 'Collection not found' });
+    const workspace = requireWorkspace(store, collection.workspaceId);
+    const user = ensureEntityAccess(req, workspace, 'editor');
+    checkVersion(collection, req.body.baseVersion);
+
+    Object.assign(collection, {
+      name: req.body.name ?? collection.name,
+      description: req.body.description ?? collection.description,
+      expanded: req.body.expanded ?? collection.expanded,
+      items: Array.isArray(req.body.items) ? req.body.items : collection.items,
+    });
+    bumpEntity(collection);
+
+    saveStore(store);
+    publishEvent('collaboration.collection.updated', {
+      workspaceId: workspace.id,
+      collectionId: collection.id,
+      version: collection.version,
+      user: { id: user.id, email: user.email },
+      at: new Date().toISOString(),
+    });
+
+    res.json({
+      ok: true,
+      collection,
+      merge: {
+        strategy: 'last-write-wins-with-version-check',
+        acceptedVersion: collection.version,
+      },
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({
+      error: error.message,
+      code: error.code,
+      currentVersion: error.currentVersion,
+    });
+  }
 });
 
 app.post('/api/collaboration/publish', (req, res) => {

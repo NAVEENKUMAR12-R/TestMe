@@ -37,5 +37,15 @@
   "flows": [],
   "mockServers": [],
   "monitors": [],
-  "history": []
+  "history": [
+    {
+      "id": "hist-1774543535321-8jr0k8",
+      "workspaceId": "ws-default",
+      "method": "GET",
+      "url": "https://httpbin.org/get",
+      "status": 200,
+      "time": 55,
+      "timestamp": "2026-03-26T16:45:35.321Z"
+    }
+  ]
 }

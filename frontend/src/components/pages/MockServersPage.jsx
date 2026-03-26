@@ -10,7 +10,8 @@ const METHOD_COLORS = { GET: '#61AFFE', POST: '#49CC90', PUT: '#FCA130', DELETE:
 
 function MockCard({ server, onClick }) {
   const [copied, setCopied] = useState(false)
-  const usagePct = Math.round((server.calls / server.callsLimit) * 100)
+  const callsLimit = Number(server.callsLimit || 0)
+  const usagePct = callsLimit > 0 ? Math.round((server.calls / callsLimit) * 100) : 0
 
   const handleCopy = (e) => {
     e.stopPropagation()
@@ -74,7 +75,7 @@ function MockCard({ server, onClick }) {
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-[10px] text-[#5A5A5A]">API calls</span>
-          <span className="text-[10px] text-[#8D8D8D]">{server.calls.toLocaleString()} / {server.callsLimit.toLocaleString()}</span>
+            <span className="text-[10px] text-[#8D8D8D]">{server.calls.toLocaleString()} / {callsLimit.toLocaleString()}</span>
         </div>
         <div className="h-1.5 bg-[#3D3D3D] rounded-full overflow-hidden">
           <div
@@ -203,7 +204,7 @@ export default function MockServersPage() {
 
   const handleCreateMockServer = async () => {
     const mock = await createMockServer({
-      name: `Mock Server ${mockServers.length + 1}`,
+      name: `Mock Server ${wsMocks.length + 1}`,
       status: 'active',
       isPublic: false,
       baseUrl: `https://mock-${Date.now()}.postflow.local`,
@@ -241,13 +242,13 @@ export default function MockServersPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          {[
-            { label: 'Total Servers', value: mockServers.length, color: '#6C63FF' },
-            { label: 'Active', value: mockServers.filter(m => m.status === 'active').length, color: '#49CC90' },
-            { label: 'Total API Calls', value: mockServers.reduce((n, m) => n + m.calls, 0).toLocaleString(), color: '#FCA130' },
-            { label: 'Total Routes', value: mockServers.reduce((n, m) => n + m.routes.length, 0), color: '#61AFFE' },
-          ].map(s => (
+          <div className="grid grid-cols-4 gap-4 mb-8">
+            {[
+              { label: 'Total Servers', value: wsMocks.length, color: '#6C63FF' },
+              { label: 'Active', value: wsMocks.filter(m => m.status === 'active').length, color: '#49CC90' },
+              { label: 'Total API Calls', value: wsMocks.reduce((n, m) => n + m.calls, 0).toLocaleString(), color: '#FCA130' },
+              { label: 'Total Routes', value: wsMocks.reduce((n, m) => n + (m.routes?.length || 0), 0), color: '#61AFFE' },
+            ].map(s => (
             <div key={s.label} className="bg-[#252525] border border-[#3D3D3D] rounded-xl p-4">
               <div className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</div>
               <div className="text-xs text-[#8D8D8D] mt-1">{s.label}</div>

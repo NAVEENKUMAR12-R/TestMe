@@ -463,7 +463,7 @@ export function AppProvider({ children }) {
         inviteMember,
         updateMemberRole,
         removeMember,
-        clearHistory,
+          clearHistory,
           runCollection,
           createApi,
           createFlow,
@@ -471,8 +471,7 @@ export function AppProvider({ children }) {
           createMonitor,
           importCollection,
           flattenRequests,
-
-      }}
+        }}
     >
       {children}
     </AppContext.Provider>

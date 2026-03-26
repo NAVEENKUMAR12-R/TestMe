@@ -16,8 +16,8 @@
           "status": "online"
         }
       ],
-      "createdAt": "2026-03-26T16:08:01.116Z",
-      "updatedAt": "2026-03-26T16:08:01.117Z"
+      "createdAt": "2026-03-26T16:58:23.825Z",
+      "updatedAt": "2026-03-26T16:58:23.825Z"
     }
   ],
   "collections": [],
@@ -29,23 +29,13 @@
       "name": "Globals",
       "isGlobal": true,
       "variables": [],
-      "createdAt": "2026-03-26T16:08:01.117Z",
-      "updatedAt": "2026-03-26T16:08:01.117Z"
+      "createdAt": "2026-03-26T16:58:23.825Z",
+      "updatedAt": "2026-03-26T16:58:23.825Z"
     }
   ],
   "apis": [],
   "flows": [],
   "mockServers": [],
   "monitors": [],
-  "history": [
-    {
-      "id": "hist-1774543535321-8jr0k8",
-      "workspaceId": "ws-default",
-      "method": "GET",
-      "url": "https://httpbin.org/get",
-      "status": 200,
-      "time": 55,
-      "timestamp": "2026-03-26T16:45:35.321Z"
-    }
-  ]
+  "history": []
 }

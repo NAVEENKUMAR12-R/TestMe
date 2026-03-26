@@ -85,21 +85,36 @@ function ensureStoreShape(data) {
   };
 }
 
+function writeStoreAtomically(store) {
+  const tempPath = `${STORE_PATH}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(store, null, 2), 'utf8');
+  fs.renameSync(tempPath, STORE_PATH);
+}
+
 function loadStore() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(STORE_PATH)) {
     const seeded = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(seeded, null, 2), 'utf8');
+    writeStoreAtomically(seeded);
     return seeded;
   }
-  const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
-  const normalized = ensureStoreShape(parsed);
-  fs.writeFileSync(STORE_PATH, JSON.stringify(normalized, null, 2), 'utf8');
-  return normalized;
+
+  try {
+    const raw = fs.readFileSync(STORE_PATH, 'utf8').trim();
+    const parsed = raw ? JSON.parse(raw) : defaultStore();
+    const normalized = ensureStoreShape(parsed);
+    writeStoreAtomically(normalized);
+    return normalized;
+  } catch (error) {
+    console.error('Failed to load store.json, resetting to defaults:', error.message);
+    const seeded = defaultStore();
+    writeStoreAtomically(seeded);
+    return seeded;
+  }
 }
 
 function saveStore(store) {
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), 'utf8');
+  writeStoreAtomically(store);
 }
 
 function publishEvent(event, payload) {

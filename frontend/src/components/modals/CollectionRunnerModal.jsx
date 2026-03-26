@@ -196,21 +196,30 @@ export default function CollectionRunnerModal() {
 
                 {/* Results list */}
                 <div className="flex-1 overflow-y-auto scrollbar-thin divide-y divide-[#3D3D3D]">
-                  {results.map((r, i) => (
-                    <div key={i} className={`flex items-center gap-3 px-4 py-3 hover:bg-[#2D2D2D]/50 transition-colors ${r.passed ? '' : 'bg-[#F93E3E]/5'}`}>
-                      {r.passed
-                        ? <CheckCircle2 size={14} className="text-[#49CC90] shrink-0" />
-                        : <AlertCircle size={14} className="text-[#F93E3E] shrink-0" />
-                      }
-                      <span className="text-[9px] font-bold w-12 shrink-0" style={{ color: METHOD_COLORS[r.request.method] }}>{r.request.method}</span>
-                      <span className="flex-1 text-xs text-[#CCCCCC] truncate">{r.request.name}</span>
-                      <span className={`text-xs font-medium w-10 text-right shrink-0 ${r.status < 300 ? 'text-[#49CC90]' : r.status < 400 ? 'text-[#61AFFE]' : 'text-[#F93E3E]'}`}>{r.status}</span>
-                      <span className="text-[11px] text-[#5A5A5A] w-14 text-right font-mono shrink-0">{r.time}ms</span>
-                      <span className={`text-[10px] shrink-0 ${r.testsPassed === r.tests ? 'text-[#49CC90]' : 'text-[#FCA130]'}`}>
-                        {r.testsPassed}/{r.tests} tests
-                      </span>
-                    </div>
-                  ))}
+                    {results.map((r, i) => {
+                      const method = r.request?.method || r.method || 'GET'
+                      const name = r.request?.name || r.name || 'Request'
+                      const testsTotal = Array.isArray(r.tests) ? r.tests.length : Number(r.tests || 0)
+                      const testsPassed = Array.isArray(r.tests)
+                        ? r.tests.filter(t => t.passed).length
+                        : Number(r.testsPassed || 0)
+
+                      return (
+                        <div key={i} className={`flex items-center gap-3 px-4 py-3 hover:bg-[#2D2D2D]/50 transition-colors ${r.passed ? '' : 'bg-[#F93E3E]/5'}`}>
+                          {r.passed
+                            ? <CheckCircle2 size={14} className="text-[#49CC90] shrink-0" />
+                            : <AlertCircle size={14} className="text-[#F93E3E] shrink-0" />
+                          }
+                          <span className="text-[9px] font-bold w-12 shrink-0" style={{ color: METHOD_COLORS[method] || '#8D8D8D' }}>{method}</span>
+                          <span className="flex-1 text-xs text-[#CCCCCC] truncate">{name}</span>
+                          <span className={`text-xs font-medium w-10 text-right shrink-0 ${r.status < 300 ? 'text-[#49CC90]' : r.status < 400 ? 'text-[#61AFFE]' : 'text-[#F93E3E]'}`}>{r.status}</span>
+                          <span className="text-[11px] text-[#5A5A5A] w-14 text-right font-mono shrink-0">{r.time}ms</span>
+                          <span className={`text-[10px] shrink-0 ${testsPassed === testsTotal ? 'text-[#49CC90]' : 'text-[#FCA130]'}`}>
+                            {testsPassed}/{testsTotal} tests
+                          </span>
+                        </div>
+                      )
+                    })}
                 </div>
               </div>
             )}

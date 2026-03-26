@@ -16,6 +16,9 @@ const NODE_TYPE_CONFIG = {
 
 function FlowCard({ flow }) {
   const [hovered, setHovered] = useState(false)
+  const nodes = Array.isArray(flow.nodes) ? flow.nodes : []
+  const previewNodes = nodes.slice(0, 5)
+
   return (
     <div
       onMouseEnter={() => setHovered(true)}
@@ -30,7 +33,7 @@ function FlowCard({ flow }) {
         }} />
         {/* Nodes */}
         <div className="relative flex items-center gap-2 h-full">
-          {flow.nodes.slice(0, 5).map((node, i) => {
+          {previewNodes.map((node, i) => {
             const cfg = NODE_TYPE_CONFIG[node.type] || NODE_TYPE_CONFIG.request
             const Icon = cfg.icon
             return (
@@ -41,16 +44,16 @@ function FlowCard({ flow }) {
                   </div>
                   <div className="text-[9px] text-[#8D8D8D] truncate max-w-[56px] text-center leading-tight">{node.label}</div>
                 </div>
-                {i < flow.nodes.slice(0, 5).length - 1 && (
+                {i < previewNodes.length - 1 && (
                   <ArrowRight size={12} className="text-[#3D3D3D] shrink-0 mb-4" />
                 )}
               </div>
             )
           })}
-          {flow.nodes.length > 5 && (
+          {nodes.length > 5 && (
             <div className="flex items-center gap-1">
               <ArrowRight size={12} className="text-[#3D3D3D]" />
-              <div className="text-[10px] text-[#5A5A5A]">+{flow.nodes.length - 5} more</div>
+              <div className="text-[10px] text-[#5A5A5A]">+{nodes.length - 5} more</div>
             </div>
           )}
         </div>
@@ -70,8 +73,8 @@ function FlowCard({ flow }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 text-[11px] text-[#5A5A5A]">
             <span className="flex items-center gap-1"><Play size={10} /> {flow.totalRuns} runs</span>
-            <span className="flex items-center gap-1"><Clock size={10} /> {flow.lastRun}</span>
-            <span className="flex items-center gap-1"><Circle size={10} /> {flow.nodes.length} nodes</span>
+              <span className="flex items-center gap-1"><Clock size={10} /> {flow.lastRun}</span>
+              <span className="flex items-center gap-1"><Circle size={10} /> {nodes.length} nodes</span>
           </div>
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button className="w-7 h-7 flex items-center justify-center text-[#5A5A5A] hover:text-[#CCCCCC] hover:bg-[#3D3D3D] rounded transition-colors">

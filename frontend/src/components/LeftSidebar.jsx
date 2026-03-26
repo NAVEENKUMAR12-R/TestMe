@@ -210,7 +210,7 @@ function APIsPanel() {
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-medium text-[#CCCCCC] truncate">{api.name}</div>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[10px] text-[#5A5A5A]">{api.version}</span>
+                    <span className="text-[10px] text-[#5A5A5A]">{api.versionLabel || 'v1.0.0'}</span>
                   <span className="text-[10px] text-[#5A5A5A]">·</span>
                   <span className="text-[10px]" style={{ color: statusColor[api.status] || '#8D8D8D' }}>{api.status}</span>
                 </div>

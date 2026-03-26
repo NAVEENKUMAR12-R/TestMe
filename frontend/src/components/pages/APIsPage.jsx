@@ -53,16 +53,16 @@ function ApiCard({ api }) {
         ))}
       </div>
 
-      <div className="flex items-center justify-between text-[10px] text-[#5A5A5A]">
-        <div className="flex items-center gap-1">
-          <GitBranch size={10} />
-          <span className="font-mono">{api.version}</span>
+        <div className="flex items-center justify-between text-[10px] text-[#5A5A5A]">
+          <div className="flex items-center gap-1">
+            <GitBranch size={10} />
+            <span className="font-mono">{api.versionLabel || 'v1.0.0'}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Clock size={10} />
+            <span>{api.lastUpdated}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Clock size={10} />
-          <span>{api.lastUpdated}</span>
-        </div>
-      </div>
     </div>
   )
 }

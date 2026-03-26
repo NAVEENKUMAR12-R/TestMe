@@ -1,6 +1,6 @@
 {
   "projectId": "358d7d58-b6b6-406d-8d07-7357a82dfb98",
-  "createdAt": 1774545790136,
+  "createdAt": 1774546833041,
   "startupCommands": ["bun install --cwd /home/user/app/backend && bun install --cwd /home/user/app/frontend; bun --cwd /home/user/app/backend run dev & bun --cwd /home/user/app/frontend run dev --host 0.0.0.0 --port 5173"],
   "templateId": "any"
 }

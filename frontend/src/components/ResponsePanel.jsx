@@ -40,7 +40,7 @@ function JsonViewer({ data }) {
   const [search, setSearch] = useState('')
   const [showSearch, setShowSearch] = useState(false)
 
-  const highlighted = search
+  const searchableText = search
     ? text.replace(new RegExp(`(${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'), '|||$1|||')
     : text
 
@@ -83,7 +83,7 @@ function JsonViewer({ data }) {
         <CopyButton text={text} />
       </div>
       <pre className="flex-1 overflow-auto text-xs font-mono leading-relaxed p-4 pt-10">
-        {text.split('\n').map((line, i) => (
+          {searchableText.split('\n').map((line, i) => (
           <div
             key={i}
             className="hover:bg-[#2D2D2D]/30 leading-5"

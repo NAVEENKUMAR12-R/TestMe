@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { createElement, useState } from 'react'
 import { useApp } from '../context/AppContext'
 import {
-  Send, ChevronDown, Search, Plus, Upload, Bell, Settings, Users,
+  Send, ChevronDown, Search, Plus, Bell, Settings, Users,
   Globe, Zap, CheckCircle2, Home, LayoutGrid, Play, Download,
-  FileCode, Terminal, ChevronRight, X, BookOpen, Activity, Server, Code2,
+  BookOpen, Activity, Server, Code2,
 } from 'lucide-react'
 
 export default function TopNavbar() {
@@ -45,20 +45,20 @@ export default function TopNavbar() {
 
       {/* Nav links */}
       <nav className="hidden md:flex items-center gap-0.5 mr-1">
-        {navLinks.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setActivePage(id)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded transition-colors ${
-              activePage === id
-                ? 'bg-[#FF6C37]/15 text-[#FF6C37]'
-                : 'text-[#CCCCCC] hover:bg-[#2D2D2D]'
-            }`}
-          >
-            <Icon size={13} />
-            {label}
-          </button>
-        ))}
+          {navLinks.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActivePage(id)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded transition-colors ${
+                activePage === id
+                  ? 'bg-[#FF6C37]/15 text-[#FF6C37]'
+                  : 'text-[#CCCCCC] hover:bg-[#2D2D2D]'
+              }`}
+            >
+              {createElement(Icon, { size: 13 })}
+              {label}
+            </button>
+          ))}
 
         {/* Workspaces dropdown */}
         <div className="relative">
@@ -189,16 +189,16 @@ export default function TopNavbar() {
                   { label: 'Collection', icon: BookOpen,  action: () => { setNewDropdown(false) } },
                   { label: 'Environment',icon: Globe,     action: () => { openModal('environment'); setNewDropdown(false) } },
                   { label: 'Workspace',  icon: LayoutGrid,action: () => { openModal('workspace'); setNewDropdown(false) } },
-                ].map(({ label, icon: Icon, action }) => (
-                  <button
-                    key={label}
-                    onClick={action}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#CCCCCC] hover:bg-[#2D2D2D] hover:text-white transition-colors"
-                  >
-                    <Icon size={13} className="text-[#8D8D8D]" />
-                    {label}
-                  </button>
-                ))}
+                  ].map(({ label, icon: Icon, action }) => (
+                    <button
+                      key={label}
+                      onClick={action}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#CCCCCC] hover:bg-[#2D2D2D] hover:text-white transition-colors"
+                    >
+                      {createElement(Icon, { size: 13, className: 'text-[#8D8D8D]' })}
+                      {label}
+                    </button>
+                  ))}
               </div>
             </>
           )}

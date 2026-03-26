@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useApp } from '../context/AppContext'
 import {
-  ChevronDown, Send, Save, Clock, Plus, Trash2, Eye, EyeOff, Lock, Key, User, AlertCircle
+  ChevronDown, Send, Save, Clock, Trash2, Eye, EyeOff, Lock,
 } from 'lucide-react'
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']
@@ -11,13 +11,18 @@ const METHOD_COLORS = {
 }
 
 function KeyValueTable({ rows, onChange, placeholder = { key: 'Key', value: 'Value' }, showDescription = true }) {
-  const addRow = () => onChange([...rows, { id: `r-${Date.now()}`, key: '', value: '', description: '', enabled: true }])
+  const rowIdCounter = useRef(rows.length)
+  const buildRow = () => {
+    rowIdCounter.current += 1
+    return { id: `r-${rowIdCounter.current}`, key: '', value: '', description: '', enabled: true }
+  }
+
   const updateRow = (id, field, val) => {
     const updated = rows.map(r => r.id === id ? { ...r, [field]: val } : r)
     // Auto add row if typing in last
     const last = updated[updated.length - 1]
     if (last.id === id && (field === 'key' || field === 'value') && val && rows.length === updated.length) {
-      onChange([...updated, { id: `r-${Date.now()}`, key: '', value: '', description: '', enabled: true }])
+      onChange([...updated, buildRow()])
     } else {
       onChange(updated)
     }
@@ -27,15 +32,16 @@ function KeyValueTable({ rows, onChange, placeholder = { key: 'Key', value: 'Val
   return (
     <div className="border border-[#3D3D3D] rounded overflow-hidden">
       {/* Header */}
-      <div className={`grid ${showDescription ? 'grid-cols-[28px_1fr_1fr_1fr_32px]' : 'grid-cols-[28px_1fr_1fr_32px]'} border-b border-[#3D3D3D]`}>
-        <div className="bg-[#1C1C1C] py-1.5" />
-        <div className="bg-[#1C1C1C] py-1.5 px-3 text-[10px] font-semibold text-[#5A5A5A] uppercase">{placeholder.key}</div>
-        <div className="bg-[#1C1C1C] py-1.5 px-3 text-[10px] font-semibold text-[#5A5A5A] uppercase">{placeholder.value}</div>
-        {showDescription && <div className="bg-[#1C1C1C] py-1.5 px-3 text-[10px] font-semibold text-[#5A5A5A] uppercase">Description</div>}
-        <div className="bg-[#1C1C1C] py-1.5" />
-      </div>
-      {rows.map((row, i) => (
-        <div
+        <div className={`grid ${showDescription ? 'grid-cols-[28px_1fr_1fr_1fr_32px]' : 'grid-cols-[28px_1fr_1fr_32px]'} border-b border-[#3D3D3D]`}>
+          <div className="bg-[#1C1C1C] py-1.5" />
+          <div className="bg-[#1C1C1C] py-1.5 px-3 text-[10px] font-semibold text-[#5A5A5A] uppercase">{placeholder.key}</div>
+          <div className="bg-[#1C1C1C] py-1.5 px-3 text-[10px] font-semibold text-[#5A5A5A] uppercase">{placeholder.value}</div>
+          {showDescription && <div className="bg-[#1C1C1C] py-1.5 px-3 text-[10px] font-semibold text-[#5A5A5A] uppercase">Description</div>}
+          <div className="bg-[#1C1C1C] py-1.5" />
+        </div>
+        {rows.map((row) => (
+          <div
+
           key={row.id}
           className={`grid ${showDescription ? 'grid-cols-[28px_1fr_1fr_1fr_32px]' : 'grid-cols-[28px_1fr_1fr_32px]'} border-b border-[#3D3D3D] last:border-0 group hover:bg-[#1C1C1C]/50 transition-colors`}
         >
@@ -221,7 +227,7 @@ function AuthPanel({ auth, onChange }) {
 const TABS = ['Params', 'Authorization', 'Headers', 'Body', 'Pre-request Script', 'Tests', 'Settings']
 
 export default function RequestBuilder() {
-  const { activeTab, activeTabId, updateTab, sendRequest, activeEnv, environments, activeEnvId } = useApp()
+  const { activeTab, activeTabId, updateTab, sendRequest } = useApp()
   const [reqTab, setReqTab] = useState('Params')
 
   if (!activeTab) return null

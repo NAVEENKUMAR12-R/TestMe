@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { createElement, useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import {
-  Settings, User, Bell, Shield, Palette, Globe, Code2,
-  Moon, Sun, Monitor, Check, ChevronRight, Keyboard,
-  Download, Upload, Trash2, ExternalLink, AlertTriangle,
-  ToggleLeft, ToggleRight, Save, X,
+  Settings, User, Bell, Shield, Palette,
+  Moon, Sun, Monitor, Check, Keyboard,
+  Download, Upload, Trash2, AlertTriangle,
+  Save,
 } from 'lucide-react'
 
 const SECTION_ICONS = {
@@ -116,10 +116,11 @@ export default function SettingsPage() {
                     ? 'bg-[#FF6C37]/15 text-[#FF6C37]'
                     : 'text-[#8D8D8D] hover:text-[#CCCCCC] hover:bg-[#2D2D2D]'
                 }`}
-              >
-                <Icon size={14} />
-                {s}
-              </button>
+                >
+                  {createElement(Icon, { size: 14 })}
+                  {s}
+                </button>
+
             )
           })}
         </nav>
@@ -207,9 +208,10 @@ export default function SettingsPage() {
                             ? 'border-[#FF6C37] text-[#FF6C37] bg-[#FF6C37]/10'
                             : 'border-[#3D3D3D] text-[#8D8D8D] hover:border-[#5A5A5A]'
                         }`}
-                      >
-                        <Icon size={15} />
-                        {label}
+                        >
+                          {createElement(Icon, { size: 15 })}
+                          {label}
+
                       </button>
                     ))}
                   </div>
@@ -376,9 +378,10 @@ export default function SettingsPage() {
                     key={label}
                     className="flex items-start gap-3 p-4 bg-[#252525] border border-[#2D2D2D] rounded-xl hover:border-[#3D3D3D] transition-colors text-left"
                   >
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: color + '20' }}>
-                      <Icon size={15} style={{ color }} />
-                    </div>
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: color + '20' }}>
+                        {createElement(Icon, { size: 15, style: { color } })}
+                      </div>
+
                     <div>
                       <div className="text-xs font-medium text-[#CCCCCC]">{label}</div>
                       <div className="text-[11px] text-[#5A5A5A] mt-0.5">{desc}</div>

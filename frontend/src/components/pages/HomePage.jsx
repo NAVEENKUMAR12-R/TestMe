@@ -1,8 +1,8 @@
+import { createElement } from 'react'
 import { useApp } from '../../context/AppContext'
 import {
   FolderOpen, Send, Clock, Activity, Server, Zap, Plus, ArrowRight,
-  TrendingUp, CheckCircle2, AlertCircle, Globe, Users, Code2,
-  Star, ExternalLink, ChevronRight,
+  TrendingUp, Globe, Users, ChevronRight,
 } from 'lucide-react'
 
 const METHOD_COLORS = { GET: '#61AFFE', POST: '#49CC90', PUT: '#FCA130', DELETE: '#F93E3E', PATCH: '#50E3C2' }
@@ -10,10 +10,11 @@ const METHOD_COLORS = { GET: '#61AFFE', POST: '#49CC90', PUT: '#FCA130', DELETE:
 function StatCard({ icon: Icon, label, value, sub, color }) {
   return (
     <div className="bg-[#252525] border border-[#3D3D3D] rounded-xl p-5 hover:border-[#5A5A5A] transition-colors">
-      <div className="flex items-start justify-between mb-4">
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: color + '20' }}>
-          <Icon size={18} style={{ color }} />
-        </div>
+        <div className="flex items-start justify-between mb-4">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: color + '20' }}>
+            {createElement(Icon, { size: 18, style: { color } })}
+          </div>
+
         <TrendingUp size={13} className="text-[#49CC90]" />
       </div>
       <div className="text-2xl font-bold text-white mb-1">{value}</div>
@@ -29,9 +30,10 @@ function QuickAction({ icon: Icon, label, desc, color, onClick }) {
       onClick={onClick}
       className="flex items-start gap-3 p-4 bg-[#252525] border border-[#3D3D3D] rounded-xl hover:border-[#FF6C37]/40 hover:bg-[#2A2A2A] transition-all text-left group"
     >
-      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: color + '20' }}>
-        <Icon size={16} style={{ color }} />
-      </div>
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: color + '20' }}>
+          {createElement(Icon, { size: 16, style: { color } })}
+        </div>
+
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-[#CCCCCC] group-hover:text-white transition-colors">{label}</div>
         <div className="text-[11px] text-[#5A5A5A] mt-0.5">{desc}</div>
@@ -49,14 +51,6 @@ export default function HomePage() {
   const activeMocks = mockServers.filter(m => m.status === 'active').length
 
   const recentHistory = history.slice(0, 6)
-
-  const getActivity = () => {
-    const items = []
-    wsCollections.forEach(c => items.push({ type: 'collection', name: c.name, sub: `${c.items?.length || 0} items`, time: '2 hrs ago', icon: FolderOpen, color: '#FF6C37' }))
-    monitors.slice(0, 2).forEach(m => items.push({ type: 'monitor', name: m.name, sub: `${m.status} · ${m.lastRun}`, time: m.lastRun, icon: Activity, color: m.status === 'passing' ? '#49CC90' : '#F93E3E' }))
-    flows.slice(0, 1).forEach(f => items.push({ type: 'flow', name: f.name, sub: `${f.totalRuns} runs`, time: f.lastRun, icon: Zap, color: '#6C63FF' }))
-    return items.slice(0, 8)
-  }
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#1C1C1C] scrollbar-thin">

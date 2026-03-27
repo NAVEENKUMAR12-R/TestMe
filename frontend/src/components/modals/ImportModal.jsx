@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import axios from 'axios'
 import { useApp } from '../../context/AppContext'
 import { X, Upload, Link2, FileJson, Code2, Terminal, Check, AlertCircle } from 'lucide-react'
 
@@ -29,7 +30,7 @@ const FORMAT_EXAMPLES = {
 }
 
 export default function ImportModal() {
-  const { closeModal, addCollection } = useApp()
+  const { closeModal, importCollection } = useApp()
   const [importType, setImportType] = useState('file')
   const [urlValue, setUrlValue] = useState('')
   const [rawText, setRawText] = useState(FORMAT_EXAMPLES.raw)
@@ -38,16 +39,105 @@ export default function ImportModal() {
   const [result, setResult] = useState(null)
   const [dragOver, setDragOver] = useState(false)
 
-  const handleImport = () => {
+  const parseCollectionText = (text) => {
+    try {
+      const parsed = JSON.parse(text)
+      if (Array.isArray(parsed?.item)) {
+        const items = parsed.item.map((it, idx) => ({
+          id: `imp-${Date.now()}-${idx}`,
+          type: 'request',
+          name: it.name || `Request ${idx + 1}`,
+          method: it.request?.method || 'GET',
+          url: typeof it.request?.url === 'string' ? it.request.url : (it.request?.url?.raw || ''),
+          headers: [],
+          params: [],
+          body: '',
+          auth: { type: 'none' },
+          preRequestScript: '',
+          testScript: '',
+        }))
+        return {
+          name: parsed.info?.name || 'Imported Collection',
+          items,
+        }
+      }
+      if (parsed.openapi || parsed.swagger) {
+        const paths = parsed.paths || {}
+        const items = Object.entries(paths).flatMap(([path, methods], pathIndex) =>
+          Object.entries(methods || {}).map(([method, op], methodIndex) => ({
+            id: `imp-${Date.now()}-${pathIndex}-${methodIndex}`,
+            type: 'request',
+            name: op?.summary || `${method.toUpperCase()} ${path}`,
+            method: method.toUpperCase(),
+            url: path,
+            headers: [],
+            params: [],
+            body: '',
+            auth: { type: 'none' },
+            preRequestScript: '',
+            testScript: '',
+          }))
+        )
+        return { name: parsed.info?.title || 'Imported OpenAPI', items }
+      }
+    } catch {
+      return null
+    }
+    return null
+  }
+
+  const parseCurl = (curl) => {
+    const method = /-X\s+(\w+)/i.exec(curl)?.[1]?.toUpperCase() || 'GET'
+    const url = /curl\s+(?:-X\s+\w+\s+)?['"]([^'"]+)['"]/i.exec(curl)?.[1] || ''
+    const headers = [...curl.matchAll(/-H\s+['"]([^:]+):\s*([^'"]+)['"]/g)].map((m) => ({ key: m[1], value: m[2], enabled: true }))
+    const body = /-d\s+['"]([\s\S]*?)['"]/.exec(curl)?.[1] || ''
+    return {
+      name: 'Imported cURL',
+      items: [
+        {
+          id: `imp-${Date.now()}`,
+          type: 'request',
+          name: `${method} ${url || '/endpoint'}`,
+          method,
+          url,
+          headers,
+          params: [],
+          body,
+          auth: { type: 'none' },
+          preRequestScript: '',
+          testScript: '',
+        },
+      ],
+    }
+  }
+
+  const handleImport = async () => {
     setImporting(true)
-    setTimeout(() => {
+    setResult(null)
+      try {
+        let parsed = null
+        if (importType === 'url' && urlValue.trim()) {
+          const { data } = await axios.get(urlValue.trim(), { timeout: 15000 })
+          parsed = parseCollectionText(typeof data === 'string' ? data : JSON.stringify(data))
+        } else if (importType === 'curl') {
+
+        parsed = parseCurl(curlText)
+      } else {
+        parsed = parseCollectionText(rawText)
+      }
+
+      if (!parsed || !Array.isArray(parsed.items) || parsed.items.length === 0) {
+        throw new Error('Unable to parse import source')
+      }
+
+      const imported = await importCollection({ name: parsed.name, items: parsed.items })
+      setResult({ success: true, message: 'Collection imported successfully!', name: imported.name, count: imported.items.length })
+      setTimeout(() => closeModal('import'), 1000)
+    } catch (error) {
+      setResult({ success: false, message: error.message || 'Import failed' })
+    } finally {
       setImporting(false)
-      setResult({ success: true, message: 'Collection imported successfully!', name: 'Imported Collection', count: 5 })
-      setTimeout(() => {
-        addCollection('Imported Collection')
-        closeModal('import')
-      }, 1200)
-    }, 1200)
+    }
   }
 
   const handleDrop = (e) => {

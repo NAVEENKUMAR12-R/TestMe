@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import { Code2, Plus, CheckCircle2, AlertCircle, Clock, ExternalLink, GitBranch, BarChart2, Zap } from 'lucide-react'
 
@@ -53,23 +52,38 @@ function ApiCard({ api }) {
         ))}
       </div>
 
-      <div className="flex items-center justify-between text-[10px] text-[#5A5A5A]">
-        <div className="flex items-center gap-1">
-          <GitBranch size={10} />
-          <span className="font-mono">{api.version}</span>
+        <div className="flex items-center justify-between text-[10px] text-[#5A5A5A]">
+          <div className="flex items-center gap-1">
+            <GitBranch size={10} />
+            <span className="font-mono">{api.versionLabel || 'v1.0.0'}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Clock size={10} />
+            <span>{api.lastUpdated}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Clock size={10} />
-          <span>{api.lastUpdated}</span>
-        </div>
-      </div>
     </div>
   )
 }
 
 export default function APIsPage() {
-  const { apis, activeWorkspaceId } = useApp()
+  const { apis, activeWorkspaceId, createApi, openModal } = useApp()
   const wsApis = apis.filter(a => a.workspaceId === activeWorkspaceId)
+
+  const handleCreateApi = async () => {
+    await createApi({
+      name: `API ${wsApis.length + 1}`,
+      description: 'New API schema',
+      type: 'REST',
+      schemaType: 'OpenAPI 3.1',
+      status: 'active',
+      endpoints: 0,
+      tests: 0,
+      monitors: 0,
+      versionLabel: 'v1.0.0',
+      lastUpdated: 'just now',
+    })
+  }
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#1C1C1C] scrollbar-thin">
@@ -79,14 +93,21 @@ export default function APIsPage() {
             <h1 className="text-xl font-bold text-white mb-1">APIs</h1>
             <p className="text-sm text-[#8D8D8D]">Design, document, and test your API schemas</p>
           </div>
-          <div className="flex gap-2">
-            <button className="flex items-center gap-2 px-4 py-2 text-xs text-[#CCCCCC] border border-[#3D3D3D] hover:border-[#5A5A5A] rounded-lg transition-colors">
-              <ExternalLink size={12} /> Import Schema
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors">
-              <Plus size={13} /> New API
-            </button>
-          </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => openModal('import')}
+                className="flex items-center gap-2 px-4 py-2 text-xs text-[#CCCCCC] border border-[#3D3D3D] hover:border-[#5A5A5A] rounded-lg transition-colors"
+              >
+                <ExternalLink size={12} /> Import Schema
+              </button>
+              <button
+                onClick={handleCreateApi}
+                className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors"
+              >
+                <Plus size={13} /> New API
+              </button>
+            </div>
+
         </div>
 
         <div className="grid grid-cols-4 gap-4 mb-8">

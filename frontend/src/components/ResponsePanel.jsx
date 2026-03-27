@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
-import { Copy, CheckCircle2, Send, AlertCircle, Clock, Download, Search } from 'lucide-react'
+import { Copy, CheckCircle2, Send, AlertCircle, Clock, Download, Search, Terminal } from 'lucide-react'
 
 const STATUS_INFO = {
   200: 'OK', 201: 'Created', 204: 'No Content', 301: 'Moved Permanently',
@@ -40,7 +40,7 @@ function JsonViewer({ data }) {
   const [search, setSearch] = useState('')
   const [showSearch, setShowSearch] = useState(false)
 
-  const highlighted = search
+  const searchableText = search
     ? text.replace(new RegExp(`(${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'), '|||$1|||')
     : text
 
@@ -83,7 +83,7 @@ function JsonViewer({ data }) {
         <CopyButton text={text} />
       </div>
       <pre className="flex-1 overflow-auto text-xs font-mono leading-relaxed p-4 pt-10">
-        {text.split('\n').map((line, i) => (
+          {searchableText.split('\n').map((line, i) => (
           <div
             key={i}
             className="hover:bg-[#2D2D2D]/30 leading-5"
@@ -117,7 +117,7 @@ function HeadersView({ headers }) {
   )
 }
 
-function TestResultsView({ testScript, response }) {
+function TestResultsView({ tests, testScript }) {
   if (!testScript) return (
     <div className="flex flex-col items-center justify-center h-full text-center p-8 gap-3">
       <div className="w-10 h-10 rounded-xl bg-[#252525] flex items-center justify-center">
@@ -126,25 +126,14 @@ function TestResultsView({ testScript, response }) {
       <p className="text-xs text-[#5A5A5A]">No test scripts found.<br />Write tests in the Tests tab.</p>
     </div>
   )
-  // Simple mock test runner
-  const tests = []
-  const lines = testScript.split('\n')
-  let passed = 0, failed = 0
-  lines.forEach(line => {
-    const m = line.match(/pm\.test\("([^"]+)"/)
-    if (m) {
-      const testName = m[1]
-      let result = false
-      if (testName.includes('200') && response?.status === 200) result = true
-      else if (testName.includes('status') && response?.status) result = true
-      else if (response) result = Math.random() > 0.3
-      result ? passed++ : failed++
-      tests.push({ name: testName, passed: result })
-    }
-  })
-  if (tests.length === 0) return (
-    <div className="text-xs text-[#5A5A5A] p-4">No pm.test() calls found in test script.</div>
-  )
+
+  if (!tests || tests.length === 0) {
+    return <div className="text-xs text-[#5A5A5A] p-4">No executed tests yet. Send the request to run tests.</div>
+  }
+
+  const passed = tests.filter(t => t.passed).length
+  const failed = tests.length - passed
+
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center gap-4 pb-3 border-b border-[#2D2D2D]">
@@ -159,6 +148,7 @@ function TestResultsView({ testScript, response }) {
             : <AlertCircle size={13} className="text-[#F93E3E] shrink-0" />
           }
           <span className="text-xs text-[#CCCCCC]">{t.name}</span>
+          {t.error && <span className="text-[10px] text-[#F93E3E] truncate">{t.error}</span>}
           <span className={`ml-auto text-[10px] font-medium ${t.passed ? 'text-[#49CC90]' : 'text-[#F93E3E]'}`}>
             {t.passed ? 'PASS' : 'FAIL'}
           </span>
@@ -171,10 +161,10 @@ function TestResultsView({ testScript, response }) {
 const RES_TABS = ['Body', 'Headers', 'Cookies', 'Test Results']
 
 export default function ResponsePanel() {
-  const { activeTab } = useApp()
+  const { activeTab, showConsole, setShowConsole, consoleLogs } = useApp()
   const [resTab, setResTab] = useState('Body')
 
-  const { response, loading, error, testScript } = activeTab || {}
+  const { response, loading, error, testScript, tests } = activeTab || {}
 
   return (
     <div className="flex flex-col flex-1 bg-[#1C1C1C] overflow-hidden min-h-0">
@@ -221,6 +211,22 @@ export default function ResponsePanel() {
             </button>
           </div>
         )}
+        {/* Console toggle */}
+        <button
+          onClick={() => setShowConsole(!showConsole)}
+          className={`flex items-center gap-1.5 px-2 py-1 text-[10px] rounded transition-colors ml-auto ${
+            showConsole ? 'text-[#FF6C37] bg-[#FF6C37]/10' : 'text-[#5A5A5A] hover:text-[#CCCCCC] hover:bg-[#2D2D2D]'
+          }`}
+          title="Toggle Console"
+        >
+          <Terminal size={12} />
+          Console
+          {consoleLogs.length > 0 && (
+            <span className="ml-0.5 px-1 py-0.5 bg-[#3D3D3D] text-[#8D8D8D] rounded text-[9px]">
+              {consoleLogs.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Response content */}
@@ -272,9 +278,9 @@ export default function ResponsePanel() {
                 </div>
               </div>
             )}
-            {resTab === 'Test Results' && (
-              <TestResultsView testScript={testScript} response={response} />
-            )}
+              {resTab === 'Test Results' && (
+                <TestResultsView testScript={testScript} tests={tests} />
+              )}
           </>
         )}
       </div>

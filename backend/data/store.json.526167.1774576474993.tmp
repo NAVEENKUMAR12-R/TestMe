@@ -1,0 +1,41 @@
+{
+  "workspaces": [
+    {
+      "id": "ws-default",
+      "name": "My Workspace",
+      "type": "personal",
+      "members": [
+        {
+          "id": "u-1",
+          "name": "You",
+          "role": "owner",
+          "color": "#FF6C37",
+          "email": "you@example.com",
+          "status": "online",
+          "initials": "Y"
+        }
+      ],
+      "createdAt": "2026-03-26T17:05:57.864Z",
+      "updatedAt": "2026-03-26T17:05:57.864Z",
+      "description": "Personal API workspace"
+    }
+  ],
+  "collections": [],
+  "environments": [
+    {
+      "version": 1,
+      "id": "env-global",
+      "name": "Globals",
+      "isGlobal": true,
+      "createdAt": "2026-03-26T17:05:57.864Z",
+      "updatedAt": "2026-03-26T17:05:57.864Z",
+      "variables": [],
+      "workspaceId": "ws-default"
+    }
+  ],
+  "apis": [],
+  "flows": [],
+  "mockServers": [],
+  "monitors": [],
+  "history": []
+}

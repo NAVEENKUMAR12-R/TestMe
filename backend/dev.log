@@ -1,0 +1,12 @@
+
+> backend@1.0.0 dev
+> nodemon index.js
+
+[33m[nodemon] 3.1.14[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[32m[nodemon] starting `node index.js`[39m
+Free Postman proxy server running on http://localhost:3001
+[0mGET /?_cb=1774451718423 [33m404[0m 1.256 ms - 139[0m
+[0mGET /?_cb=1774452237327 [33m404[0m 0.814 ms - 139[0m

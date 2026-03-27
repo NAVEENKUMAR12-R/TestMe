@@ -84,7 +84,7 @@ export default function TeamModal() {
                       value={inviteEmail}
                       onChange={e => setInviteEmail(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleInvite()}
-                      placeholder="teammate@company.com"
+                      placeholder="teammate@example.com"
                       className="flex-1 bg-transparent py-2 text-xs text-[#CCCCCC] placeholder:text-[#3D3D3D] outline-none"
                     />
                   </div>

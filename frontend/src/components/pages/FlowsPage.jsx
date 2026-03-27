@@ -15,13 +15,11 @@ const NODE_TYPE_CONFIG = {
 }
 
 function FlowCard({ flow }) {
-  const [hovered, setHovered] = useState(false)
+  const nodes = Array.isArray(flow.nodes) ? flow.nodes : []
+  const previewNodes = nodes.slice(0, 5)
+
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className="bg-[#252525] border border-[#3D3D3D] rounded-xl overflow-hidden hover:border-[#5A5A5A] transition-all cursor-pointer group"
-    >
+    <div className="bg-[#252525] border border-[#3D3D3D] rounded-xl overflow-hidden hover:border-[#5A5A5A] transition-all cursor-pointer group">
       {/* Flow canvas preview */}
       <div className="h-36 bg-[#1C1C1C] relative overflow-hidden p-4">
         <div className="absolute inset-0 opacity-10" style={{
@@ -30,7 +28,7 @@ function FlowCard({ flow }) {
         }} />
         {/* Nodes */}
         <div className="relative flex items-center gap-2 h-full">
-          {flow.nodes.slice(0, 5).map((node, i) => {
+          {previewNodes.map((node, i) => {
             const cfg = NODE_TYPE_CONFIG[node.type] || NODE_TYPE_CONFIG.request
             const Icon = cfg.icon
             return (
@@ -41,16 +39,16 @@ function FlowCard({ flow }) {
                   </div>
                   <div className="text-[9px] text-[#8D8D8D] truncate max-w-[56px] text-center leading-tight">{node.label}</div>
                 </div>
-                {i < flow.nodes.slice(0, 5).length - 1 && (
+                {i < previewNodes.length - 1 && (
                   <ArrowRight size={12} className="text-[#3D3D3D] shrink-0 mb-4" />
                 )}
               </div>
             )
           })}
-          {flow.nodes.length > 5 && (
+          {nodes.length > 5 && (
             <div className="flex items-center gap-1">
               <ArrowRight size={12} className="text-[#3D3D3D]" />
-              <div className="text-[10px] text-[#5A5A5A]">+{flow.nodes.length - 5} more</div>
+              <div className="text-[10px] text-[#5A5A5A]">+{nodes.length - 5} more</div>
             </div>
           )}
         </div>
@@ -70,8 +68,8 @@ function FlowCard({ flow }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 text-[11px] text-[#5A5A5A]">
             <span className="flex items-center gap-1"><Play size={10} /> {flow.totalRuns} runs</span>
-            <span className="flex items-center gap-1"><Clock size={10} /> {flow.lastRun}</span>
-            <span className="flex items-center gap-1"><Circle size={10} /> {flow.nodes.length} nodes</span>
+              <span className="flex items-center gap-1"><Clock size={10} /> {flow.lastRun}</span>
+              <span className="flex items-center gap-1"><Circle size={10} /> {nodes.length} nodes</span>
           </div>
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button className="w-7 h-7 flex items-center justify-center text-[#5A5A5A] hover:text-[#CCCCCC] hover:bg-[#3D3D3D] rounded transition-colors">
@@ -99,7 +97,7 @@ function FlowBuilder({ flow, onClose }) {
       setRunning(false)
       setRunResults({
         success: true,
-        steps: flow.nodes.map((n, i) => ({
+          steps: flow.nodes.map((n) => ({
           node: n,
           status: Math.random() > 0.1 ? 'pass' : 'fail',
           duration: Math.floor(Math.random() * 300) + 50,
@@ -250,9 +248,23 @@ function FlowBuilder({ flow, onClose }) {
 }
 
 export default function FlowsPage() {
-  const { flows, activeWorkspaceId } = useApp()
+  const { flows, activeWorkspaceId, createFlow } = useApp()
   const [selectedFlow, setSelectedFlow] = useState(null)
   const wsFlows = flows.filter(f => f.workspaceId === activeWorkspaceId)
+
+  const handleCreateFlow = async () => {
+    const flow = await createFlow({
+      name: `Flow ${wsFlows.length + 1}`,
+      description: 'Automated workflow',
+      status: 'draft',
+      nodes: [
+        { id: `node-${Date.now()}`, type: 'request', label: 'Request Step', method: 'GET' },
+      ],
+      totalRuns: 0,
+      lastRun: 'never',
+    })
+    if (flow) setSelectedFlow(flow)
+  }
 
   if (selectedFlow) {
     return <FlowBuilder flow={selectedFlow} onClose={() => setSelectedFlow(null)} />
@@ -267,9 +279,13 @@ export default function FlowsPage() {
             <h1 className="text-xl font-bold text-white mb-1">Flows</h1>
             <p className="text-sm text-[#8D8D8D]">Build and automate multi-step API workflows visually</p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors">
-            <Plus size={13} /> New Flow
-          </button>
+            <button
+              onClick={handleCreateFlow}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors"
+            >
+              <Plus size={13} /> New Flow
+            </button>
+
         </div>
 
         {/* Stats row */}
@@ -295,9 +311,13 @@ export default function FlowsPage() {
             </div>
             <p className="text-sm font-medium text-[#CCCCCC] mb-1">No flows yet</p>
             <p className="text-xs text-[#5A5A5A]">Create a flow to automate multi-step API workflows</p>
-            <button className="mt-4 flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors">
-              <Plus size={13} /> Create First Flow
-            </button>
+              <button
+                onClick={handleCreateFlow}
+                className="mt-4 flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors"
+              >
+                <Plus size={13} /> Create First Flow
+              </button>
+
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

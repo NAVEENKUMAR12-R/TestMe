@@ -203,7 +203,7 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     if (!activeWorkspaceId) return undefined
-    const source = new EventSource(`/api/collaboration/events?workspaceId=${activeWorkspaceId}`)
+    const source = new EventSource(`${API_BASE}/api/collaboration/events?workspaceId=${activeWorkspaceId}`)
 
     const refreshWorkspace = () => {
       hydrateWorkspace(activeWorkspaceId).catch(() => {})

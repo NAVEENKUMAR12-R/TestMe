@@ -552,6 +552,17 @@ function requireWorkspace(store, workspaceId) {
   return workspace;
 }
 
+function listAccessibleWorkspaces(store, req, minimumRole = 'viewer') {
+  const user = getUser(req);
+  return store.workspaces.filter((workspace) => canAccess(workspace, user.id, minimumRole));
+}
+
+function requireWorkspaceAccess(store, req, workspaceId, minimumRole = 'viewer') {
+  const workspace = requireWorkspace(store, workspaceId);
+  ensureEntityAccess(req, workspace, minimumRole);
+  return workspace;
+}
+
 function checkVersion(entity, expectedVersion) {
   if (expectedVersion === undefined || expectedVersion === null) return;
   const normalized = Number(expectedVersion);
@@ -842,15 +853,23 @@ app.get('/health', (_req, res) => {
 
 app.get('/api/bootstrap', (req, res) => {
   const store = loadStore();
-  const workspaceId = req.query.workspaceId || store.workspaces[0]?.id;
-  const workspace = store.workspaces.find((w) => w.id === workspaceId) || store.workspaces[0];
+  const accessible = listAccessibleWorkspaces(store, req, 'viewer');
+  if (accessible.length === 0) {
+    return res.status(403).json({ error: 'No accessible workspace found for this user' });
+  }
+
+  const requestedWorkspaceId = req.query.workspaceId;
+  const workspace = requestedWorkspaceId
+    ? accessible.find((w) => w.id === requestedWorkspaceId)
+    : accessible[0];
+
   if (!workspace) {
-    return res.status(404).json({ error: 'No workspace found' });
+    return res.status(403).json({ error: 'Workspace access denied' });
   }
 
   res.json({
     workspace,
-    workspaces: store.workspaces,
+    workspaces: accessible,
     collections: store.collections.filter((c) => c.workspaceId === workspace.id),
     environments: store.environments.filter((e) => e.workspaceId === workspace.id),
     apis: store.apis.filter((a) => a.workspaceId === workspace.id),
@@ -861,9 +880,9 @@ app.get('/api/bootstrap', (req, res) => {
   });
 });
 
-app.get('/api/workspaces', (_req, res) => {
+app.get('/api/workspaces', (req, res) => {
   const store = loadStore();
-  res.json(store.workspaces);
+  res.json(listAccessibleWorkspaces(store, req, 'viewer'));
 });
 
 app.post('/api/workspaces', (req, res) => {
@@ -1431,10 +1450,22 @@ app.post('/api/collaboration/publish', (req, res) => {
 });
 
 app.get('/api/history', (req, res) => {
-  const store = loadStore();
-  const workspaceId = req.query.workspaceId;
-  const history = workspaceId ? store.history.filter((h) => h.workspaceId === workspaceId) : store.history;
-  res.json(history);
+  try {
+    const store = loadStore();
+    const requestedWorkspaceId = req.query.workspaceId;
+
+    if (requestedWorkspaceId) {
+      const workspace = requireWorkspaceAccess(store, req, requestedWorkspaceId, 'viewer');
+      const history = store.history.filter((h) => h.workspaceId === workspace.id);
+      return res.json(history);
+    }
+
+    const workspaceIds = new Set(listAccessibleWorkspaces(store, req, 'viewer').map((workspace) => workspace.id));
+    const history = store.history.filter((entry) => workspaceIds.has(entry.workspaceId));
+    return res.json(history);
+  } catch (error) {
+    return res.status(error.status || 500).json({ error: error.message });
+  }
 });
 
 app.delete('/api/history', (req, res) => {

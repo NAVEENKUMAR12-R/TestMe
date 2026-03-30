@@ -17,6 +17,7 @@ const STATUS_DOTS = {
 export default function TeamModal() {
   const {
     activeWorkspace,
+    supabaseUser,
     closeModal,
     inviteMember,
     updateMemberRole,
@@ -31,6 +32,10 @@ export default function TeamModal() {
   const [workspaceName, setWorkspaceName] = useState(activeWorkspace?.name || '')
   const [workspaceDescription, setWorkspaceDescription] = useState(activeWorkspace?.description || '')
   const [savingWorkspace, setSavingWorkspace] = useState(false)
+  const [inviteError, setInviteError] = useState('')
+
+  const currentUserId = supabaseUser?.id || ''
+  const currentUserEmail = (supabaseUser?.email || '').toLowerCase()
 
   if (!activeWorkspace) return null
 
@@ -42,11 +47,12 @@ export default function TeamModal() {
   const handleInvite = async () => {
     if (!inviteEmail.trim() || !inviteEmail.includes('@')) return
     try {
+      setInviteError('')
       await inviteMember(activeWorkspace.id, inviteEmail.trim(), inviteRole)
       setInviteSent(true)
       setTimeout(() => { setInviteSent(false); setInviteEmail('') }, 2000)
     } catch (error) {
-      console.error('Failed to invite member', error)
+      setInviteError(error?.response?.data?.message || error.message || 'Failed to invite member')
     }
   }
 
@@ -155,6 +161,7 @@ export default function TeamModal() {
                 <p className="text-[11px] text-[#5A5A5A] mt-2">
                   They'll receive an email with a link to join this workspace.
                 </p>
+                {inviteError && <p className="text-[11px] text-[#F93E3E] mt-2">{inviteError}</p>}
               </div>
 
               {/* Members list */}
@@ -166,6 +173,7 @@ export default function TeamModal() {
                   {activeWorkspace.members.map((member, i) => {
                     const RoleIcon = ROLE_CONFIG[member.role]?.icon || Shield
                     const roleColor = ROLE_CONFIG[member.role]?.color || '#8D8D8D'
+                    const isCurrentUser = member.id === currentUserId || member.email?.toLowerCase() === currentUserEmail
                     return (
                       <div
                         key={member.id}
@@ -183,14 +191,14 @@ export default function TeamModal() {
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-medium text-[#CCCCCC] flex items-center gap-2">
                             {member.name}
-                            {member.id === 'u-1' && (
+                            {isCurrentUser && (
                               <span className="text-[9px] px-1.5 py-0.5 bg-[#06B6D4]/15 text-[#06B6D4] rounded-full font-medium">You</span>
                             )}
                           </div>
                           <div className="text-[11px] text-[#5A5A5A] truncate">{member.email}</div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {member.id === 'u-1' ? (
+                          {isCurrentUser ? (
                             <div
                               className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium"
                               style={{ backgroundColor: roleColor + '15', color: roleColor }}
@@ -208,7 +216,7 @@ export default function TeamModal() {
                               <option value="viewer" className="bg-[#252525]">Viewer</option>
                             </select>
                           )}
-                          {member.id !== 'u-1' && (
+                          {!isCurrentUser && (
                             <button
                               onClick={() => removeMember(activeWorkspace.id, member.id)}
                               className="text-[#5A5A5A] hover:text-[#F93E3E] p-1.5 rounded hover:bg-[#F93E3E]/10 transition-colors"

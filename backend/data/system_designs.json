@@ -1,5 +1,224 @@
 [
   {
+    "id": "systemDesign-1774858449468-4sc6af",
+    "workspaceId": "ws-1774849694318-1njdxk",
+    "userId": "8360d5a6-c3b9-410c-a19e-6ce38db7d7d8",
+    "payload": {
+      "projectName": "Realtime Commerce Platform",
+      "description": "Multi-tenant API and dashboard for orders, inventory, and payments with webhook driven automations.",
+      "expectedUsers": 80000,
+      "traffic": 1200,
+      "features": [
+        "Auth",
+        "API Gateway",
+        "Billing",
+        "Webhooks",
+        "Search",
+        "Observability"
+      ],
+      "nonFunctionalRequirements": [
+        "p95 < 250ms",
+        "99.9% availability",
+        "GDPR",
+        "SOC2"
+      ],
+      "constraints": [
+        "Seed budget",
+        "small SRE team"
+      ],
+      "preferences": {
+        "cloud": "AWS",
+        "stack": "Node.js, React, PostgreSQL"
+      },
+      "workspaceId": "ws-1774849694318-1njdxk"
+    },
+    "result": {
+      "overview": "Realtime Commerce Platform: Multi-tenant API and dashboard for orders, inventory, and payments with webhook driven automations.",
+      "architecture": {
+        "type": "hybrid",
+        "reason": "Moderate scale benefits from modular cores plus a few extracted services.",
+        "diagram_ascii": "Client -> CDN -> Load Balancer -> API Gateway\nAPI Gateway -> App Service (modular)\nApp/Services -> Cache -> Primary DB\nApp/Services -> Message Queue -> Workers\nWorkers -> Object Storage / Analytics",
+        "diagram_nodes": [
+          {
+            "id": "client",
+            "type": "frontend"
+          },
+          {
+            "id": "cdn",
+            "type": "cdn"
+          },
+          {
+            "id": "lb",
+            "type": "load_balancer"
+          },
+          {
+            "id": "api",
+            "type": "api_gateway"
+          },
+          {
+            "id": "app",
+            "type": "application"
+          },
+          {
+            "id": "cache",
+            "type": "cache"
+          },
+          {
+            "id": "db",
+            "type": "database"
+          },
+          {
+            "id": "queue",
+            "type": "message_queue"
+          },
+          {
+            "id": "worker",
+            "type": "worker"
+          },
+          {
+            "id": "storage",
+            "type": "object_storage"
+          }
+        ],
+        "diagram_edges": [
+          {
+            "from": "client",
+            "to": "cdn"
+          },
+          {
+            "from": "cdn",
+            "to": "lb"
+          },
+          {
+            "from": "lb",
+            "to": "api"
+          },
+          {
+            "from": "api",
+            "to": "app"
+          },
+          {
+            "from": "app",
+            "to": "cache"
+          },
+          {
+            "from": "app",
+            "to": "db"
+          },
+          {
+            "from": "app",
+            "to": "queue"
+          },
+          {
+            "from": "queue",
+            "to": "worker"
+          },
+          {
+            "from": "worker",
+            "to": "storage"
+          }
+        ]
+      },
+      "components": [
+        {
+          "name": "Load Balancer",
+          "purpose": "Distribute traffic and terminate TLS",
+          "options": [
+            "NGINX",
+            "AWS ALB"
+          ],
+          "scaling_note": "Autoscale target groups by CPU/latency"
+        },
+        {
+          "name": "API Gateway",
+          "purpose": "Routing, auth, and rate limits",
+          "options": [
+            "Kong",
+            "AWS API Gateway"
+          ],
+          "scaling_note": "Horizontal with stateless config"
+        },
+        {
+          "name": "App Service",
+          "purpose": "Own business logic and enforce policies",
+          "options": [
+            "Node.js + Express"
+          ],
+          "scaling_note": "Scale per service or process"
+        },
+        {
+          "name": "Cache",
+          "purpose": "Reduce DB reads and absorb spikes",
+          "options": [
+            "Redis"
+          ],
+          "scaling_note": "Cluster with hash slots; warm on deploy"
+        },
+        {
+          "name": "Database",
+          "purpose": "System of record",
+          "options": [
+            "PostgreSQL + Redis"
+          ],
+          "scaling_note": "Read replicas, partitioning, Redis clustering"
+        },
+        {
+          "name": "Message Queue",
+          "purpose": "Decouple async workloads",
+          "options": [
+            "RabbitMQ",
+            "SQS"
+          ],
+          "scaling_note": "Scale consumers; DLQ for poison messages"
+        },
+        {
+          "name": "Object Storage",
+          "purpose": "Assets, exports, artifacts",
+          "options": [
+            "S3",
+            "GCS"
+          ],
+          "scaling_note": "Versioning + lifecycle policies"
+        }
+      ],
+      "database": {
+        "type": "Hybrid",
+        "choice": "PostgreSQL + Redis",
+        "reason": "Strong consistency for core data with Redis for hot paths.",
+        "scaling_strategy": "Read replicas, partitioning, Redis clustering"
+      },
+      "caching": {
+        "used": true,
+        "tool": "Redis",
+        "strategy": "Cache reads (TTL 5-15m), write-through for critical aggregates, request dedupe for spikes."
+      },
+      "scaling": {
+        "approach": "horizontal",
+        "details": "Scale app instances behind LB; add read replicas; shard only when metrics demand."
+      },
+      "api_design": {
+        "style": "REST",
+        "examples": [
+          "POST /system-design/analyze",
+          "GET /system-designs/{id}",
+          "POST /system-designs/{id}/regenerate"
+        ]
+      },
+      "advanced_features": [
+        "CDN",
+        "Message Queue",
+        "Rate Limiting"
+      ],
+      "tradeoffs": [
+        "More services increase operational overhead; balance against latency budgets.",
+        "Aggressive caching can stale data; set clear TTL and cache-busting rules.",
+        "Queue-first patterns improve resilience but add eventual consistency paths."
+      ],
+      "estimated_complexity": "Low"
+    },
+    "createdAt": "2026-03-30T08:14:09.469Z"
+  },
+  {
     "id": "systemDesign-1774831556908-82c8o7",
     "workspaceId": "ws-1774849694318-1njdxk",
     "userId": "8360d5a6-c3b9-410c-a19e-6ce38db7d7d8",

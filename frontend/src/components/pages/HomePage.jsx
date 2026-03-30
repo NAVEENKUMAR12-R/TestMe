@@ -7,6 +7,17 @@ import {
 
 const METHOD_COLORS = { GET: '#61AFFE', POST: '#49CC90', PUT: '#FCA130', DELETE: '#F93E3E', PATCH: '#50E3C2' }
 
+function formatDisplayName(name) {
+  const raw = String(name || '').trim()
+  if (!raw) return 'You'
+  return raw
+    .replace(/[._-]+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
+}
+
 function StatCard({ icon: Icon, label, value, sub, color }) {
   return (
     <div className="bg-[#252525] border border-[#3D3D3D] rounded-xl p-5 hover:border-[#5A5A5A] transition-colors">
@@ -92,7 +103,7 @@ export default function HomePage() {
             {activeWorkspace?.members?.map(m => (
               <div
                 key={m.id}
-                title={`${m.name} (${m.role})`}
+                title={`${formatDisplayName(m.name)} (${m.role})`}
                 className="w-8 h-8 rounded-full border-2 border-[#252525] flex items-center justify-center text-[10px] font-bold cursor-pointer"
                 style={{ backgroundColor: m.color + '40', color: m.color }}
               >                {m.initials}
@@ -103,7 +114,7 @@ export default function HomePage() {
             {activeWorkspace?.members?.filter(m => m.status === 'online').map(m => (
               <div key={m.id} className="flex items-center gap-1 text-[11px] text-[#5A5A5A]">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#49CC90]" />
-                {m.name.split(' ')[0]}
+                {formatDisplayName(m.name).split(' ')[0]}
               </div>
             ))}
           </div>

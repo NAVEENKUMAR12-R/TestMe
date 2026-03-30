@@ -21,11 +21,11 @@ function MethodBadge({ method }) {
   )
 }
 
-function RequestItem({ req, depth = 0 }) {
+function RequestItem({ req, depth = 0, collectionId }) {
   const { openRequest } = useApp()
   return (
     <div
-      onClick={() => openRequest(req)}
+      onClick={() => openRequest(req, collectionId)}
       className="flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer hover:bg-[#2D2D2D] group transition-colors"
       style={{ paddingLeft: `${8 + depth * 16}px` }}
     >
@@ -59,7 +59,7 @@ function FolderItem({ folder, depth = 0, collectionId }) {
       {folder.expanded && folder.items?.map(item => (
         item.type === 'folder'
           ? <FolderItem key={item.id} folder={item} depth={depth + 1} collectionId={collectionId} />
-          : <RequestItem key={item.id} req={item} depth={depth + 1} />
+          : <RequestItem key={item.id} req={item} depth={depth + 1} collectionId={collectionId} />
       ))}
     </div>
   )
@@ -93,12 +93,12 @@ function CollectionItem({ collection }) {
 
       {collection.expanded && (
         <div className="ml-2">
-          {collection.items.map(item =>
+          {(collection.items || []).map(item =>
             item.type === 'folder'
               ? <FolderItem key={item.id} folder={item} depth={0} collectionId={collection.id} />
-              : <RequestItem key={item.id} req={item} depth={0} />
+              : <RequestItem key={item.id} req={item} depth={0} collectionId={collection.id} />
           )}
-          {collection.items.length === 0 && (
+          {(collection.items || []).length === 0 && (
             <div className="px-4 py-2 text-[11px] text-[#5A5A5A]">Empty collection</div>
           )}
         </div>
@@ -110,18 +110,51 @@ function CollectionItem({ collection }) {
 // ─── Panels ───────────────────────────────────────────────────────────────────
 
 function CollectionsPanel() {
-  const { collections, addCollection } = useApp()
+  const {
+    collections,
+    addCollection,
+    activeWorkspace,
+    workspaces,
+    activeWorkspaceId,
+    setActiveWorkspaceId,
+    addWorkspace,
+  } = useApp()
   const [search, setSearch] = useState('')
   const [addingNew, setAddingNew] = useState(false)
   const [newName, setNewName] = useState('')
+  const [addingProject, setAddingProject] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [creatingProject, setCreatingProject] = useState(false)
+  const [creatingCollection, setCreatingCollection] = useState(false)
 
   const filtered = collections.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()))
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (newName.trim()) {
-      addCollection(newName.trim())
-      setNewName('')
-      setAddingNew(false)
+      try {
+        setCreatingCollection(true)
+        await addCollection(newName.trim())
+        setNewName('')
+        setAddingNew(false)
+      } catch {
+        setAddingNew(false)
+      } finally {
+        setCreatingCollection(false)
+      }
+    }
+  }
+
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim()) return
+    try {
+      setCreatingProject(true)
+      await addWorkspace(newProjectName.trim(), 'team', '')
+      setNewProjectName('')
+      setAddingProject(false)
+    } catch {
+      setAddingProject(false)
+    } finally {
+      setCreatingProject(false)
     }
   }
 
@@ -129,14 +162,53 @@ function CollectionsPanel() {
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 pt-3 pb-2 shrink-0">
         <span className="text-xs font-semibold text-[#CCCCCC]">Collections</span>
-        <button
-          onClick={() => setAddingNew(true)}
-          className="text-[#8D8D8D] hover:text-[#CCCCCC] p-1 rounded hover:bg-[#2D2D2D] transition-colors"
-          title="New collection"
-        >
-          <Plus size={13} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setAddingProject(true)}
+            className="text-[10px] px-2 py-1 rounded border border-[#3D3D3D] text-[#8D8D8D] hover:text-[#CCCCCC] hover:border-[#06B6D4]/50 transition-colors"
+            title="New project"
+          >
+            + Project
+          </button>
+          <button
+            onClick={() => setAddingNew(true)}
+            className="text-[#8D8D8D] hover:text-[#CCCCCC] p-1 rounded hover:bg-[#2D2D2D] transition-colors"
+            title="New collection"
+          >
+            <Plus size={13} />
+          </button>
+        </div>
       </div>
+
+      <div className="px-3 pb-2 space-y-2">
+        <div className="text-[10px] text-[#5A5A5A] uppercase tracking-wider">Project</div>
+        <select
+          value={activeWorkspaceId || ''}
+          onChange={(e) => setActiveWorkspaceId(e.target.value)}
+          className="w-full h-7 bg-[#1C1C1C] border border-[#3D3D3D] rounded px-2 text-xs text-[#CCCCCC] outline-none focus:border-[#06B6D4]/50"
+        >
+          {workspaces.map((ws) => (
+            <option key={ws.id} value={ws.id} className="bg-[#252525]">
+              {ws.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {addingProject && (
+        <div className="px-3 mb-2 shrink-0">
+          <input
+            autoFocus
+            value={newProjectName}
+            onChange={e => setNewProjectName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleCreateProject(); if (e.key === 'Escape') setAddingProject(false) }}
+            onBlur={() => { if (!newProjectName.trim()) setAddingProject(false) }}
+            placeholder="Project name..."
+            className="w-full h-7 px-2 bg-[#1C1C1C] border border-[#06B6D4]/50 rounded text-xs text-[#CCCCCC] outline-none focus:ring-1 focus:ring-[#06B6D4]/20 transition-all"
+          />
+          {creatingProject && <div className="mt-1 text-[10px] text-[#5A5A5A]">Creating project...</div>}
+        </div>
+      )}
 
       <div className="px-3 mb-2 shrink-0">
         <div className="flex items-center gap-2 h-7 px-2 bg-[#1C1C1C] border border-[#3D3D3D] rounded">
@@ -158,9 +230,10 @@ function CollectionsPanel() {
             onChange={e => setNewName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setAddingNew(false) }}
             onBlur={() => { if (!newName.trim()) setAddingNew(false) }}
-            placeholder="Collection name..."
+            placeholder={activeWorkspace ? 'Collection name...' : 'Select a project first'}
             className="w-full h-7 px-2 bg-[#1C1C1C] border border-[#06B6D4]/50 rounded text-xs text-[#CCCCCC] outline-none focus:ring-1 focus:ring-[#06B6D4]/20 transition-all"
           />
+          {creatingCollection && <div className="mt-1 text-[10px] text-[#5A5A5A]">Creating collection...</div>}
         </div>
       )}
 

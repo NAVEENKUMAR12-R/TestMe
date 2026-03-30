@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../context/AppContext'
 import {
   ChevronDown, Send, Save, Clock, Trash2, Eye, EyeOff, Lock,
@@ -227,8 +227,23 @@ function AuthPanel({ auth, onChange }) {
 const TABS = ['Params', 'Authorization', 'Headers', 'Body', 'Pre-request Script', 'Tests', 'Settings']
 
 export default function RequestBuilder() {
-  const { activeTab, activeTabId, updateTab, sendRequest, saveRequest } = useApp()
+  const { activeTab, activeTabId, updateTab, sendRequest, saveRequest, collections } = useApp()
   const [reqTab, setReqTab] = useState('Params')
+  const [saveCollectionId, setSaveCollectionId] = useState('auto')
+
+  useEffect(() => {
+    if (activeTab?.collectionId) {
+      setSaveCollectionId(activeTab.collectionId)
+      return
+    }
+    setSaveCollectionId('auto')
+  }, [activeTabId, activeTab?.collectionId])
+
+  useEffect(() => {
+    if (saveCollectionId === 'auto') return
+    const exists = collections.some((c) => c.id === saveCollectionId)
+    if (!exists) setSaveCollectionId('auto')
+  }, [collections, saveCollectionId])
 
   if (!activeTab) return null
 
@@ -279,12 +294,27 @@ export default function RequestBuilder() {
         </button>
 
         {/* Save button */}
-        <button 
-          onClick={() => saveRequest(activeTab)}
+        <div className="flex items-center gap-2 shrink-0">
+          <select
+            value={saveCollectionId}
+            onChange={(e) => setSaveCollectionId(e.target.value)}
+            className="h-8 bg-[#1C1C1C] border border-[#3D3D3D] rounded px-2 text-xs text-[#CCCCCC] outline-none focus:border-[#FF6C37]/50"
+            title="Choose where to save"
+          >
+            <option value="auto" className="bg-[#252525]">Auto collection</option>
+            {collections.map((collection) => (
+              <option key={collection.id} value={collection.id} className="bg-[#252525]">
+                {collection.name}
+              </option>
+            ))}
+          </select>
+          <button
+          onClick={() => saveRequest(activeTab, { collectionId: saveCollectionId === 'auto' ? undefined : saveCollectionId })}
           className="flex items-center gap-1.5 px-3 py-1.5 border border-[#3D3D3D] text-xs font-medium text-[#CCCCCC] hover:border-[#FF6C37]/50 hover:text-white rounded transition-colors shrink-0">
           <Save size={13} />
           Save
         </button>
+        </div>
       </div>
 
       {/* Request tabs */}

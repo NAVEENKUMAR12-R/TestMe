@@ -6,10 +6,21 @@ import {
   BookOpen, Activity, Server, Code2,
 } from 'lucide-react'
 
+function formatDisplayName(name) {
+  const raw = String(name || '').trim()
+  if (!raw) return 'You'
+  return raw
+    .replace(/[._-]+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
+}
+
 export default function TopNavbar() {
   const {
     workspaces, activeWorkspace, activeWorkspaceId, setActiveWorkspaceId,
-    openModal, activePage, setActivePage, addTab,
+    openModal, activePage, setActivePage, addTab, addCollection, setSidePanel,
     supabaseUser, signOut,
   } = useApp()
 
@@ -19,8 +30,9 @@ export default function TopNavbar() {
   const [searchText, setSearchText] = useState('')
   const [accountDropdown, setAccountDropdown] = useState(false)
 
-  const workspaceMembers = activeWorkspace?.members ?? []
-  const displayName = supabaseUser?.user_metadata?.name || supabaseUser?.email?.split('@')[0] || 'You'
+  const displayName = formatDisplayName(
+    supabaseUser?.user_metadata?.name || supabaseUser?.email?.split('@')[0] || 'You',
+  )
   const userInitial = displayName.slice(0, 1).toUpperCase()
 
   const handleSwitchWorkspace = (wsId) => {
@@ -193,7 +205,17 @@ export default function TopNavbar() {
               <div className="absolute top-full right-0 mt-1 w-48 bg-[#252525] border border-[#3D3D3D] rounded-lg shadow-xl z-50 overflow-hidden py-1">
                 {[
                   { label: 'Request',    icon: Send,     action: () => { addTab(); setActivePage('builder'); setNewDropdown(false) } },
-                  { label: 'Collection', icon: BookOpen,  action: () => { setNewDropdown(false) } },
+                  { label: 'Collection', icon: BookOpen,  action: async () => {
+                    setNewDropdown(false)
+                    try {
+                      await addCollection('New Collection')
+                      setSidePanel('collections')
+                      setActivePage('builder')
+                    } catch (error) {
+                      // eslint-disable-next-line no-console
+                      console.error('Failed to create collection', error)
+                    }
+                  } },
                   { label: 'Environment',icon: Globe,     action: () => { openModal('environment'); setNewDropdown(false) } },
                   { label: 'Workspace',  icon: LayoutGrid,action: () => { openModal('workspace'); setNewDropdown(false) } },
                   ].map(({ label, icon: Icon, action }) => (
@@ -226,26 +248,6 @@ export default function TopNavbar() {
         >
           <Settings size={15} />
         </button>
-
-        {/* Workspace member avatars */}
-          <div className="hidden lg:flex items-center -space-x-1.5 ml-1">
-            {workspaceMembers.slice(0, 3).map(m => (
-              <div
-                key={m.id}
-                className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border-2 cursor-pointer"
-                style={{ backgroundColor: m.color + '40', color: m.color, borderColor: '#1C1C1C' }}
-                title={m.name}
-              >
-                {m.initials?.[0] || '?'}
-              </div>
-            ))}
-            {workspaceMembers.length > 3 && (
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-medium bg-[#2D2D2D] text-[#8D8D8D] border-2 border-[#1C1C1C]">
-                +{workspaceMembers.length - 3}
-              </div>
-            )}
-          </div>
-
 
           <div className="relative">
             <button

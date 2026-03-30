@@ -310,11 +310,14 @@ export function AppProvider({ children }) {
     }))
   }, [])
 
-  const openRequest = useCallback((req) => {
+  const openRequest = useCallback((req, collectionId = null) => {
     const normalized = normalizeRequest(req)
     const existing = tabs.find(t => t.requestId === normalized.id)
     if (existing) {
       setActiveTabId(existing.id)
+      if (collectionId && existing.collectionId !== collectionId) {
+        setTabs(prev => prev.map(t => (t.id === existing.id ? { ...t, collectionId } : t)))
+      }
       setActivePage('builder')
       return
     }
@@ -322,6 +325,7 @@ export function AppProvider({ children }) {
       ...normalized,
       id: `tab-${tabCounter.current++}`,
       requestId: normalized.id,
+      collectionId,
       dirty: false,
     })
     setTabs(prev => [...prev, tab])
@@ -348,7 +352,12 @@ export function AppProvider({ children }) {
 
   const sendRequest = useCallback(async (tabId) => {
     const tab = tabs.find(t => t.id === tabId)
-    if (!tab || !activeWorkspaceId) return
+    if (!tab) return
+    if (!activeWorkspaceId) {
+      appendConsole({ type: 'error', source: 'network', message: 'No active workspace available. Reload and sign in again.' })
+      setTabs(prev => prev.map(t => (t.id === tabId ? { ...t, loading: false, error: 'No active workspace available', response: null } : t)))
+      return
+    }
 
     updateTab(tabId, { loading: true, error: null, response: null, tests: [] })
     appendConsole({ type: 'log', source: 'network', message: `→ ${tab.method} ${tab.url}` })
@@ -384,28 +393,48 @@ export function AppProvider({ children }) {
     }
   }, [api, tabs, activeWorkspaceId, activeEnvId, updateTab, appendConsole])
 
-  const persistCollection = useCallback(async (collection) => {
+  const persistCollection = useCallback(async (collection, workspaceIdOverride) => {
+    const workspaceId = workspaceIdOverride || activeWorkspaceId || activeWorkspace?.id
     if (!collection.id || String(collection.id).startsWith('col-temp-')) {
-      const { data } = await api.post(`/api/collections`, { ...collection, workspaceId: activeWorkspaceId })
+      const { data } = await api.post(`/api/collections`, { ...collection, workspaceId })
       return data
     }
     const { data } = await api.patch(`/api/collections/${collection.id}`, collection)
     return data
-  }, [api, activeWorkspaceId])
+  }, [api, activeWorkspaceId, activeWorkspace])
 
   const addCollection = useCallback(async (name) => {
+    let workspaceId = activeWorkspaceId || activeWorkspace?.id
+
+    if (!workspaceId) {
+      const { data } = await api.get('/api/bootstrap')
+      const fallbackWorkspace = data.workspace || data.workspaces?.[0]
+      if (!fallbackWorkspace?.id) {
+        throw new Error('No project workspace available. Create a workspace first.')
+      }
+
+      workspaceId = fallbackWorkspace.id
+      setActiveWorkspaceId(fallbackWorkspace.id)
+      setWorkspaces(data.workspaces || [])
+      setEnvironments(data.environments || [])
+      setCollections(data.collections || [])
+    }
+
     const draft = {
       id: `col-temp-${Date.now()}`,
-      workspaceId: activeWorkspaceId,
+      workspaceId,
       name,
       description: '',
       expanded: true,
       items: [],
     }
-    const saved = await persistCollection(draft)
-    setCollections(prev => [...prev, saved])
+    const saved = await persistCollection(draft, workspaceId)
+    setCollections(prev => {
+      if (prev.some(c => c.id === saved.id)) return prev
+      return [...prev, saved]
+    })
     return saved
-  }, [activeWorkspaceId, persistCollection])
+  }, [activeWorkspaceId, activeWorkspace, api, persistCollection])
 
   const saveRequest = useCallback(async (tab, options = {}) => {
     if (!tab || !activeWorkspaceId) return null
@@ -420,18 +449,38 @@ export function AppProvider({ children }) {
     })
 
     const persistCollectionDraft = async (collectionDraft) => {
-      const { data } = await api.patch(`/api/collections/${collectionDraft.id}`, {
+      const payload = {
         name: collectionDraft.name,
         description: collectionDraft.description,
         expanded: collectionDraft.expanded,
         items: collectionDraft.items,
         version: collectionDraft.version,
-      })
-      setCollections(prev => prev.map(c => (c.id === data.id ? data : c)))
-      return data
+      }
+
+      try {
+        const { data } = await api.patch(`/api/collections/${collectionDraft.id}`, payload)
+        setCollections(prev => prev.map(c => (c.id === data.id ? data : c)))
+        return data
+      } catch (error) {
+        const status = error?.response?.status
+        if (status !== 409) throw error
+
+        const { data: latestState } = await api.get(`/api/bootstrap`, { params: { workspaceId: activeWorkspaceId } })
+        const latestCollection = (latestState.collections || []).find(c => c.id === collectionDraft.id)
+        if (!latestCollection) throw error
+
+        const { data } = await api.patch(`/api/collections/${collectionDraft.id}`, {
+          ...payload,
+          version: latestCollection.version,
+        })
+
+        setCollections(latestState.collections || [])
+        setCollections(prev => prev.map(c => (c.id === data.id ? data : c)))
+        return data
+      }
     }
 
-    const replaceRequest = (items = []) => {
+    const upsertRequest = (items = []) => {
       let touched = false
       const updatedItems = items.map((item) => {
         if (item.id === requestPayload.id) {
@@ -439,7 +488,7 @@ export function AppProvider({ children }) {
           return requestPayload
         }
         if (item.type === 'folder' && Array.isArray(item.items)) {
-          const nested = replaceRequest(item.items)
+          const nested = upsertRequest(item.items)
           if (nested.touched) {
             touched = true
             return { ...item, items: nested.items }
@@ -447,47 +496,58 @@ export function AppProvider({ children }) {
         }
         return item
       })
-      return { items: updatedItems, touched }
-    }
-
-    let updatedCollection = null
-    let updatedItems = null
-    for (const collection of collections) {
-      const result = replaceRequest(collection.items || [])
-      if (result.touched) {
-        updatedCollection = collection
-        updatedItems = result.items
-        break
+      if (!touched) {
+        return { items: [...updatedItems, requestPayload], touched: true, created: true }
       }
+      return { items: updatedItems, touched, created: false }
     }
 
-    if (updatedCollection) {
-      const draft = { ...updatedCollection, items: updatedItems }
+    const selectedCollectionId = options.collectionId || tab.collectionId || null
+    const explicitDestination = options.collectionId ? collections.find(c => c.id === options.collectionId) : null
+
+    // If user selected a save destination, always save into that collection.
+    if (explicitDestination) {
+      const result = upsertRequest(explicitDestination.items || [])
+      const draft = { ...explicitDestination, items: result.items }
       try {
         const saved = await persistCollectionDraft(draft)
         setTabs(prev => prev.map(t => (
           t.id === tab.id
-            ? { ...t, dirty: false, requestId: requestPayload.id, collectionId: updatedCollection.id }
+            ? { ...t, dirty: false, requestId: requestPayload.id, collectionId: explicitDestination.id }
             : t
         )))
-        appendConsole({ type: 'log', message: `Saved ${requestPayload.name} to ${updatedCollection.name}` })
+        appendConsole({ type: 'log', message: `${result.created ? 'Created' : 'Saved'} ${requestPayload.name} in ${explicitDestination.name}` })
         return saved
       } catch (error) {
         appendConsole({ type: 'error', message: `Failed to save request: ${error.message}` })
         await hydrateWorkspace(activeWorkspaceId)
+        return null
       }
-      return null
     }
 
-    let destination = collections.find(c => c.id === (options.collectionId || tab.collectionId))
+    // Normal save: prefer tab's pointed collection, then collection containing this request, then workspace default.
+    let destination = selectedCollectionId ? collections.find(c => c.id === selectedCollectionId) : null
+
+    if (!destination && requestPayload.id) {
+      for (const collection of collections) {
+        const hasRequest = flattenRequests(collection.items || []).some((item) => item.id === requestPayload.id)
+        if (hasRequest) {
+          destination = collection
+          break
+        }
+      }
+    }
+
     if (!destination) {
       destination = collections.find(c => c.workspaceId === activeWorkspaceId)
     }
+
     if (!destination) {
       destination = await addCollection('Saved Requests')
     }
 
-    const draft = { ...destination, items: [...(destination.items || []), requestPayload] }
+    const result = upsertRequest(destination.items || [])
+    const draft = { ...destination, items: result.items }
     try {
       const savedCollection = await persistCollectionDraft(draft)
       setTabs(prev => prev.map(t => (
@@ -495,10 +555,10 @@ export function AppProvider({ children }) {
           ? { ...t, dirty: false, requestId: requestPayload.id, collectionId: savedCollection.id }
           : t
       )))
-      appendConsole({ type: 'log', message: `Created ${requestPayload.name} in ${savedCollection.name}` })
+      appendConsole({ type: 'log', message: `${result.created ? 'Created' : 'Saved'} ${requestPayload.name} in ${savedCollection.name}` })
       return savedCollection
     } catch (error) {
-      appendConsole({ type: 'error', message: `Failed to create request: ${error.message}` })
+      appendConsole({ type: 'error', message: `Failed to save request: ${error.message}` })
       await hydrateWorkspace(activeWorkspaceId)
       return null
     }

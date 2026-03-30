@@ -451,12 +451,34 @@ function defaultStore() {
   };
 }
 
+function createStarterCollection(workspaceId, workspaceName = 'Workspace') {
+  const now = new Date().toISOString();
+  return {
+    id: createId('col'),
+    workspaceId,
+    name: `${workspaceName} Collection`,
+    description: `Main collection for ${workspaceName}`,
+    expanded: true,
+    items: [],
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function ensureStoreShape(data) {
   const fallback = defaultStore();
   const withVersion = (entity) => ({ version: 1, ...entity, version: Number(entity?.version || 1) });
+  const normalizeCollection = (collection) => ({
+    ...withVersion(collection),
+    name: collection?.name || 'New Collection',
+    description: typeof collection?.description === 'string' ? collection.description : '',
+    expanded: collection?.expanded !== false,
+    items: Array.isArray(collection?.items) ? collection.items : [],
+  });
   return {
     workspaces: Array.isArray(data?.workspaces) ? data.workspaces : fallback.workspaces,
-    collections: Array.isArray(data?.collections) ? data.collections.map(withVersion) : [],
+    collections: Array.isArray(data?.collections) ? data.collections.map(normalizeCollection) : [],
     environments: Array.isArray(data?.environments) ? data.environments.map(withVersion) : fallback.environments,
     apis: Array.isArray(data?.apis) ? data.apis.map(withVersion) : [],
     flows: Array.isArray(data?.flows) ? data.flows.map(withVersion) : [],
@@ -579,6 +601,53 @@ function requireWorkspace(store, workspaceId) {
 function listAccessibleWorkspaces(store, req, minimumRole = 'viewer') {
   const user = getUser(req);
   return store.workspaces.filter((workspace) => canAccess(workspace, user.id, minimumRole));
+}
+
+function ensureUserWorkspace(store, req) {
+  const user = getUser(req);
+  const hasWorkspaceAccess = store.workspaces.some((workspace) => canAccess(workspace, user.id, 'viewer'));
+  if (hasWorkspaceAccess) return null;
+
+  const displayName = user.name || user.email?.split('@')[0] || 'You';
+  const workspaceId = createId('ws');
+  const now = new Date().toISOString();
+
+  const workspace = {
+    id: workspaceId,
+    name: `${displayName}'s Workspace`,
+    type: 'personal',
+    description: 'Auto-provisioned personal workspace',
+    members: [
+      {
+        id: user.id,
+        name: displayName,
+        email: user.email,
+        role: 'owner',
+        initials: displayName.slice(0, 2).toUpperCase(),
+        color: '#FF6C37',
+        status: 'online',
+      },
+    ],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const environment = {
+    id: createId('env'),
+    workspaceId,
+    name: 'Globals',
+    isGlobal: true,
+    variables: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  store.workspaces.push(workspace);
+  store.environments.push(environment);
+  store.collections.push(createStarterCollection(workspaceId, workspace.name));
+  saveStore(store);
+
+  return workspace;
 }
 
 function requireWorkspaceAccess(store, req, workspaceId, minimumRole = 'viewer') {
@@ -876,6 +945,7 @@ app.use('/api/system-design', systemDesignRoutes({ loadStore, requireWorkspaceAc
 app.get('/api/bootstrap', (req, res, next) => {
   try {
     const store = loadStore();
+    ensureUserWorkspace(store, req);
     const accessible = listAccessibleWorkspaces(store, req, 'viewer');
     if (accessible.length === 0) {
       throw new ApiError(403, 'No accessible workspace found for this user', 'ERR_FORBIDDEN');
@@ -950,6 +1020,7 @@ app.post('/api/workspaces', validatePayload(['name']), (req, res, next) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+    store.collections.push(createStarterCollection(ws.id, ws.name));
     saveStore(store);
     auditEvent(req, 'workspace.created', ws.id, 'workspace', ws.id, { name: ws.name, type: ws.type });
     publishEvent('workspace.created', { workspaceId: ws.id, workspace: ws });

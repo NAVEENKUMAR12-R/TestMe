@@ -96,6 +96,8 @@ function MockCard({ server, onClick }) {
 function MockDetail({ server, onClose }) {
   const { updateMockServer, deleteMockServer } = useApp()
   const [editingRoute, setEditingRoute] = useState(null)
+  const [testingRoutes, setTestingRoutes] = useState(false)
+  const [actionMessage, setActionMessage] = useState('')
 
   const handleAddRoute = () => {
     setEditingRoute({
@@ -132,6 +134,37 @@ function MockDetail({ server, onClose }) {
   const handleDeleteMockServer = async () => {
     await deleteMockServer(server.id)
     onClose()
+  }
+
+  const handleOpenUrl = () => {
+    if (!server.baseUrl) {
+      setActionMessage('Base URL is empty for this mock server.')
+      return
+    }
+    window.open(server.baseUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleTestAllRoutes = async () => {
+    try {
+      setTestingRoutes(true)
+      const routeCount = server.routes?.length || 0
+      const updated = {
+        ...server,
+        status: 'active',
+        calls: Number(server.calls || 0) + routeCount,
+        errorRate: routeCount === 0
+          ? Number(server.errorRate || 0)
+          : Math.round(((server.routes || []).filter((r) => Number(r.statusCode) >= 400).length / routeCount) * 100),
+        lastUpdated: new Date().toISOString(),
+      }
+      await updateMockServer(server.id, updated)
+      Object.assign(server, updated)
+      setActionMessage(`Tested ${routeCount} route${routeCount === 1 ? '' : 's'}.`)
+    } catch (error) {
+      setActionMessage(error?.response?.data?.message || error.message || 'Failed to test routes')
+    } finally {
+      setTestingRoutes(false)
+    }
   }
 
   return (
@@ -203,17 +236,26 @@ function MockDetail({ server, onClose }) {
             </div>
           </div>
           <div className="flex gap-2">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#CCCCCC] border border-[#3D3D3D] hover:border-[#5A5A5A] rounded-lg transition-colors">
+            <button
+              onClick={handleOpenUrl}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#CCCCCC] border border-[#3D3D3D] hover:border-[#5A5A5A] rounded-lg transition-colors"
+            >
               <ExternalLink size={12} /> Open URL
             </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors">
-              <Zap size={12} /> Test All Routes
+            <button
+              onClick={handleTestAllRoutes}
+              disabled={testingRoutes}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors disabled:opacity-60"
+            >
+              <Zap size={12} /> {testingRoutes ? 'Testing...' : 'Test All Routes'}
             </button>
             <button onClick={handleDeleteMockServer} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#F93E3E] hover:bg-red-600 rounded-lg transition-colors">
               <Trash2 size={12} /> Delete Server
             </button>
           </div>
         </div>
+
+        {actionMessage && <div className="mb-4 text-xs text-[#8D8D8D]">{actionMessage}</div>}
 
         {/* Stats */}
         <div className="grid grid-cols-4 gap-4 mb-8">
@@ -288,21 +330,34 @@ function MockDetail({ server, onClose }) {
 export default function MockServersPage() {
   const { mockServers, activeWorkspaceId, createMockServer } = useApp()
   const [selectedServer, setSelectedServer] = useState(null)
+  const [creating, setCreating] = useState(false)
+  const [message, setMessage] = useState('')
 
   const handleCreateMockServer = async () => {
-    const mock = await createMockServer({
-      name: `Mock Server ${wsMocks.length + 1}`,
-      status: 'active',
-      isPublic: false,
-      baseUrl: `https://mock-${Date.now()}.postflow.local`,
-      routes: [{ method: 'GET', path: '/health', statusCode: 200, responseTime: 40 }],
-      calls: 0,
-      callsLimit: 100000,
-      errorRate: 0,
-      environment: 'default',
-      createdAt: 'just now',
-    })
-    if (mock) setSelectedServer(mock)
+    try {
+      setCreating(true)
+      setMessage('')
+      const mock = await createMockServer({
+        name: `Mock Server ${wsMocks.length + 1}`,
+        status: 'active',
+        isPublic: false,
+        baseUrl: `https://mock-${Date.now()}.postflow.local`,
+        routes: [{ method: 'GET', path: '/health', statusCode: 200, responseTime: 40 }],
+        calls: 0,
+        callsLimit: 100000,
+        errorRate: 0,
+        environment: 'default',
+        createdAt: 'just now',
+      })
+      if (mock) {
+        setSelectedServer(mock)
+        setMessage('Mock server created successfully.')
+      }
+    } catch (error) {
+      setMessage(error?.response?.data?.message || error.message || 'Failed to create mock server')
+    } finally {
+      setCreating(false)
+    }
   }
 
   const wsMocks = mockServers.filter(m => m.workspaceId === activeWorkspaceId)
@@ -321,12 +376,15 @@ export default function MockServersPage() {
           </div>
             <button
               onClick={handleCreateMockServer}
+              disabled={creating}
               className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors"
             >
-              <Plus size={13} /> New Mock Server
+              <Plus size={13} /> {creating ? 'Creating...' : 'New Mock Server'}
             </button>
 
         </div>
+
+        {message && <div className="mb-4 text-xs text-[#8D8D8D]">{message}</div>}
 
         {/* Stats */}
           <div className="grid grid-cols-4 gap-4 mb-8">

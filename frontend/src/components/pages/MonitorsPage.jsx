@@ -90,12 +90,17 @@ function MonitorCard({ monitor, onClick }) {
 function MonitorDetail({ monitor, onClose, onRun }) {
   const isPassing = monitor.status === 'passing'
   const [running, setRunning] = useState(false)
+  const [message, setMessage] = useState('')
 
   const handleRun = async () => {
     if (!onRun) return
     setRunning(true)
+    setMessage('')
     try {
       await onRun(monitor)
+      setMessage('Monitor run completed.')
+    } catch (error) {
+      setMessage(error?.response?.data?.message || error.message || 'Failed to run monitor')
     } finally {
       setRunning(false)
     }
@@ -135,6 +140,8 @@ function MonitorDetail({ monitor, onClose, onRun }) {
             </button>
           </div>
         </div>
+
+        {message && <div className="mb-4 text-xs text-[#8D8D8D]">{message}</div>}
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -209,22 +216,35 @@ function MonitorDetail({ monitor, onClose, onRun }) {
 export default function MonitorsPage() {
   const { monitors, activeWorkspaceId, createMonitor, runMonitor } = useApp()
   const [selectedMonitor, setSelectedMonitor] = useState(null)
+  const [creating, setCreating] = useState(false)
+  const [message, setMessage] = useState('')
 
   const handleCreateMonitor = async () => {
-    const monitor = await createMonitor({
-      name: `Monitor ${monitors.length + 1}`,
-      status: 'paused',
-      schedule: '*/5 * * * *',
-      region: 'us-east-1',
-      uptime: 100,
-      totalRuns: 0,
-      failedRuns: 0,
-      avgResponseTime: 0,
-      lastRun: 'never',
-      lastFailure: 'Never',
-      recentRuns: [],
-    })
-    if (monitor) setSelectedMonitor(monitor)
+    try {
+      setCreating(true)
+      setMessage('')
+      const monitor = await createMonitor({
+        name: `Monitor ${monitors.length + 1}`,
+        status: 'paused',
+        schedule: '*/5 * * * *',
+        region: 'us-east-1',
+        uptime: 100,
+        totalRuns: 0,
+        failedRuns: 0,
+        avgResponseTime: 0,
+        lastRun: 'never',
+        lastFailure: 'Never',
+        recentRuns: [],
+      })
+      if (monitor) {
+        setSelectedMonitor(monitor)
+        setMessage('Monitor created successfully.')
+      }
+    } catch (error) {
+      setMessage(error?.response?.data?.message || error.message || 'Failed to create monitor')
+    } finally {
+      setCreating(false)
+    }
   }
 
   const wsMonitors = monitors.filter(m => m.workspaceId === activeWorkspaceId)
@@ -260,12 +280,15 @@ export default function MonitorsPage() {
           </div>
             <button
               onClick={handleCreateMonitor}
+              disabled={creating}
               className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors"
             >
-              <Plus size={13} /> New Monitor
+              <Plus size={13} /> {creating ? 'Creating...' : 'New Monitor'}
             </button>
 
         </div>
+
+        {message && <div className="mb-4 text-xs text-[#8D8D8D]">{message}</div>}
 
         {/* Overall status banner */}
         {failing > 0 && (

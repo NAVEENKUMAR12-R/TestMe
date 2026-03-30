@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import { Code2, Plus, CheckCircle2, AlertCircle, Clock, ExternalLink, GitBranch, BarChart2, Zap } from 'lucide-react'
 
@@ -68,21 +69,32 @@ function ApiCard({ api }) {
 
 export default function APIsPage() {
   const { apis, activeWorkspaceId, createApi, openModal } = useApp()
+  const [creating, setCreating] = useState(false)
+  const [message, setMessage] = useState('')
   const wsApis = apis.filter(a => a.workspaceId === activeWorkspaceId)
 
   const handleCreateApi = async () => {
-    await createApi({
-      name: `API ${wsApis.length + 1}`,
-      description: 'New API schema',
-      type: 'REST',
-      schemaType: 'OpenAPI 3.1',
-      status: 'active',
-      endpoints: 0,
-      tests: 0,
-      monitors: 0,
-      versionLabel: 'v1.0.0',
-      lastUpdated: 'just now',
-    })
+    try {
+      setCreating(true)
+      setMessage('')
+      await createApi({
+        name: `API ${wsApis.length + 1}`,
+        description: 'New API schema',
+        type: 'REST',
+        schemaType: 'OpenAPI 3.1',
+        status: 'active',
+        endpoints: 0,
+        tests: 0,
+        monitors: 0,
+        versionLabel: 'v1.0.0',
+        lastUpdated: 'just now',
+      })
+      setMessage('API created successfully.')
+    } catch (error) {
+      setMessage(error?.response?.data?.message || error.message || 'Failed to create API')
+    } finally {
+      setCreating(false)
+    }
   }
 
   return (
@@ -102,13 +114,18 @@ export default function APIsPage() {
               </button>
               <button
                 onClick={handleCreateApi}
+                disabled={creating}
                 className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors"
               >
-                <Plus size={13} /> New API
+                <Plus size={13} /> {creating ? 'Creating...' : 'New API'}
               </button>
             </div>
 
         </div>
+
+        {message && (
+          <div className="mb-4 text-xs text-[#8D8D8D]">{message}</div>
+        )}
 
         <div className="grid grid-cols-4 gap-4 mb-8">
           {[

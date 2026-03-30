@@ -77,14 +77,14 @@ export default function ConsolePanel() {
     <div className="flex flex-col bg-[#1C1C1C] border-t border-[#3D3D3D] shrink-0" style={{ height: `${height}px` }}>
       {/* Drag handle */}
       <div
-        className="h-1.5 bg-transparent hover:bg-[#FF6C37]/30 cursor-row-resize shrink-0 transition-colors"
+        className="h-1.5 bg-transparent hover:bg-[#06B6D4]/30 cursor-row-resize shrink-0 transition-colors"
         onMouseDown={handleMouseDown}
       />
 
       {/* Header */}
       <div className="flex items-center gap-3 px-3 py-1.5 border-b border-[#3D3D3D] bg-[#1C1C1C] shrink-0">
         <div className="flex items-center gap-1.5 text-[11px] text-[#CCCCCC] font-medium">
-          <Terminal size={12} className="text-[#FF6C37]" />
+          <Terminal size={12} className="text-[#06B6D4]" />
           Console
         </div>
         <div className="flex gap-1 ml-2">

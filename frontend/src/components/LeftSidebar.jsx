@@ -79,8 +79,8 @@ function CollectionItem({ collection }) {
           ? <ChevronDown size={12} className="text-[#8D8D8D] shrink-0" />
           : <ChevronRight size={12} className="text-[#8D8D8D] shrink-0" />
         }
-        <div className="w-5 h-5 rounded flex items-center justify-center bg-[#FF6C37]/15 shrink-0">
-          <FolderOpen size={11} className="text-[#FF6C37]" />
+        <div className="w-5 h-5 rounded flex items-center justify-center bg-[#06B6D4]/15 shrink-0">
+          <FolderOpen size={11} className="text-[#06B6D4]" />
         </div>
         <span className="flex-1 text-xs font-medium text-[#CCCCCC] truncate">{collection.name}</span>
         <button
@@ -159,7 +159,7 @@ function CollectionsPanel() {
             onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setAddingNew(false) }}
             onBlur={() => { if (!newName.trim()) setAddingNew(false) }}
             placeholder="Collection name..."
-            className="w-full h-7 px-2 bg-[#1C1C1C] border border-[#FF6C37]/50 rounded text-xs text-[#CCCCCC] outline-none"
+            className="w-full h-7 px-2 bg-[#1C1C1C] border border-[#06B6D4]/50 rounded text-xs text-[#CCCCCC] outline-none focus:ring-1 focus:ring-[#06B6D4]/20 transition-all"
           />
         </div>
       )}
@@ -392,9 +392,9 @@ export default function LeftSidebar() {
                 key={item.id}
                 onClick={() => togglePanel(item.id)}
                 title={item.label}
-                className={`w-9 h-9 flex items-center justify-center rounded transition-colors ${
+                className={`w-9 h-9 flex items-center justify-center rounded transition-all ${
                   sidePanel === item.id
-                    ? 'bg-[#FF6C37]/15 text-[#FF6C37]'
+                    ? 'bg-[#06B6D4]/15 text-[#06B6D4]'
                     : 'text-[#5A5A5A] hover:text-[#CCCCCC] hover:bg-[#2D2D2D]'
                 }`}
               >

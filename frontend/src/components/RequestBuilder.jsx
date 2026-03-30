@@ -207,7 +207,7 @@ function AuthPanel({ auth, onChange }) {
         <div className="p-4 border border-[#3D3D3D] rounded text-center">
           <div className="text-xs text-[#8D8D8D] mb-2">OAuth 2.0 configuration</div>
           <p className="text-[11px] text-[#5A5A5A]">Get New Access Token to authorize requests</p>
-          <button className="mt-3 px-4 py-1.5 text-xs font-medium text-white bg-[#FF6C37] rounded hover:bg-[#e05a2a] transition-colors">
+          <button className="mt-3 px-4 py-1.5 text-xs font-medium text-white bg-[#06B6D4] rounded hover:bg-[#0891B2] transition-all hover:shadow-md hover:shadow-cyan-500/20">
             Get New Access Token
           </button>
         </div>
@@ -217,7 +217,7 @@ function AuthPanel({ auth, onChange }) {
         <div className="flex items-center gap-2 text-xs text-[#5A5A5A] py-2">
           <Lock size={13} />
           This request does not use any authorization.
-          <span className="text-[#FF6C37] cursor-pointer hover:underline">Inherit from parent</span>
+          <span className="text-[#06B6D4] cursor-pointer hover:underline transition-colors">Inherit from parent</span>
         </div>
       )}
     </div>
@@ -272,7 +272,7 @@ export default function RequestBuilder() {
         <button
           onClick={() => sendRequest(activeTabId)}
           disabled={activeTab.loading || !activeTab.url}
-          className="flex items-center gap-2 px-5 py-1.5 bg-[#FF6C37] hover:bg-[#e05a2a] text-white text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          className="flex items-center gap-2 px-5 py-1.5 bg-[#06B6D4] hover:bg-[#0891B2] text-white text-sm font-medium rounded transition-all hover:shadow-lg hover:shadow-cyan-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none shrink-0"
         >
           {activeTab.loading ? <Clock size={14} className="animate-spin" /> : <Send size={14} />}
           Send

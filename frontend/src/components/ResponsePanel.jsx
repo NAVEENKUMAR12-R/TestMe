@@ -177,7 +177,7 @@ export default function ResponsePanel() {
               onClick={() => setResTab(tab)}
               className={`pb-2 pt-1.5 px-1 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
                 resTab === tab
-                  ? 'border-[#FF6C37] text-white'
+                  ? 'border-[#06B6D4] text-white'
                   : 'border-transparent text-[#8D8D8D] hover:text-[#CCCCCC]'
               }`}
             >
@@ -214,8 +214,8 @@ export default function ResponsePanel() {
         {/* Console toggle */}
         <button
           onClick={() => setShowConsole(!showConsole)}
-          className={`flex items-center gap-1.5 px-2 py-1 text-[10px] rounded transition-colors ml-auto ${
-            showConsole ? 'text-[#FF6C37] bg-[#FF6C37]/10' : 'text-[#5A5A5A] hover:text-[#CCCCCC] hover:bg-[#2D2D2D]'
+          className={`flex items-center gap-1.5 px-2 py-1 text-[10px] rounded transition-all ml-auto ${
+            showConsole ? 'text-[#06B6D4] bg-[#06B6D4]/10' : 'text-[#5A5A5A] hover:text-[#CCCCCC] hover:bg-[#2D2D2D]'
           }`}
           title="Toggle Console"
         >
@@ -233,7 +233,7 @@ export default function ResponsePanel() {
       <div className="flex-1 overflow-auto">
         {loading && (
           <div className="h-full flex items-center justify-center gap-3">
-            <Clock size={18} className="text-[#FF6C37] animate-spin" />
+            <Clock size={18} className="text-[#06B6D4] animate-spin" />
             <span className="text-sm text-[#8D8D8D]">Sending request...</span>
           </div>
         )}

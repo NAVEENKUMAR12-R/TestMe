@@ -18,9 +18,137 @@
       "createdAt": "2026-03-26T17:05:57.864Z",
       "updatedAt": "2026-03-26T17:05:57.864Z",
       "description": "Personal API workspace"
+    },
+    {
+      "id": "ws-1774849618645-5hsql0",
+      "name": "Tester's Workspace",
+      "type": "personal",
+      "members": [
+        {
+          "id": "u-test-123",
+          "name": "Tester",
+          "role": "owner",
+          "color": "#FF6C37",
+          "email": "u-test-123@example.com",
+          "status": "online",
+          "initials": "TE"
+        }
+      ],
+      "createdAt": "2026-03-30T05:46:58.645Z",
+      "updatedAt": "2026-03-30T05:46:58.645Z",
+      "description": "Auto-provisioned personal workspace"
+    },
+    {
+      "id": "ws-1774849630834-58mvf8",
+      "name": "Tester2's Workspace",
+      "type": "personal",
+      "members": [
+        {
+          "id": "u-test-456",
+          "name": "Tester2",
+          "role": "owner",
+          "color": "#FF6C37",
+          "email": "u-test-456@example.com",
+          "status": "online",
+          "initials": "TE"
+        }
+      ],
+      "createdAt": "2026-03-30T05:47:10.834Z",
+      "updatedAt": "2026-03-30T05:47:10.834Z",
+      "description": "Auto-provisioned personal workspace"
+    },
+    {
+      "id": "ws-1774849694318-1njdxk",
+      "name": "vimal's Workspace",
+      "type": "personal",
+      "members": [
+        {
+          "id": "8360d5a6-c3b9-410c-a19e-6ce38db7d7d8",
+          "name": "vimal",
+          "role": "owner",
+          "color": "#FF6C37",
+          "email": "vimalraja2910@gmail.com",
+          "status": "online",
+          "initials": "VI"
+        }
+      ],
+      "createdAt": "2026-03-30T05:48:14.318Z",
+      "updatedAt": "2026-03-30T05:48:14.318Z",
+      "description": "Auto-provisioned personal workspace"
+    },
+    {
+      "id": "ws-1774850057356-k1ze5b",
+      "name": "Saver's Workspace",
+      "type": "personal",
+      "members": [
+        {
+          "id": "u-save-1",
+          "name": "Saver",
+          "role": "owner",
+          "color": "#FF6C37",
+          "email": "u-save-1@example.com",
+          "status": "online",
+          "initials": "SA"
+        }
+      ],
+      "createdAt": "2026-03-30T05:54:17.356Z",
+      "updatedAt": "2026-03-30T05:54:17.356Z",
+      "description": "Auto-provisioned personal workspace"
     }
   ],
-  "collections": [],
+  "collections": [
+    {
+      "version": 3,
+      "id": "col-1774849909903-2acaot",
+      "name": "Saved Requests",
+      "items": [],
+      "expanded": true,
+      "createdAt": "2026-03-30T05:51:49.903Z",
+      "updatedAt": "2026-03-30T00:40:29.064Z",
+      "description": "",
+      "workspaceId": "ws-1774849694318-1njdxk"
+    },
+    {
+      "version": 1,
+      "id": "col-1774850044419-zu4gdo",
+      "name": "Save Test Collection",
+      "items": [],
+      "expanded": true,
+      "createdAt": "2026-03-30T05:54:04.419Z",
+      "updatedAt": "2026-03-30T05:54:04.419Z",
+      "description": "",
+      "workspaceId": "ws-default"
+    },
+    {
+      "version": 2,
+      "id": "col-1774850057403-0wmgfr",
+      "name": "Save Test Collection",
+      "items": [
+        {
+          "id": "req-1",
+          "url": "https://postman-echo.com/get",
+          "auth": {
+            "type": "noauth"
+          },
+          "body": "",
+          "name": "Ping",
+          "type": "request",
+          "method": "GET",
+          "params": [],
+          "headers": [],
+          "bodyType": "raw",
+          "preScript": "",
+          "timeoutMs": 10000,
+          "testScript": ""
+        }
+      ],
+      "expanded": true,
+      "createdAt": "2026-03-30T05:54:17.403Z",
+      "updatedAt": "2026-03-30T05:54:17.417Z",
+      "description": "",
+      "workspaceId": "ws-1774850057356-k1ze5b"
+    }
+  ],
   "environments": [
     {
       "version": 1,
@@ -31,13 +159,146 @@
       "updatedAt": "2026-03-26T17:05:57.864Z",
       "variables": [],
       "workspaceId": "ws-default"
+    },
+    {
+      "version": 1,
+      "id": "env-1774849618645-fr7a44",
+      "name": "Globals",
+      "isGlobal": true,
+      "createdAt": "2026-03-30T05:46:58.645Z",
+      "updatedAt": "2026-03-30T05:46:58.645Z",
+      "variables": [],
+      "workspaceId": "ws-1774849618645-5hsql0"
+    },
+    {
+      "version": 1,
+      "id": "env-1774849630834-alrzof",
+      "name": "Globals",
+      "isGlobal": true,
+      "createdAt": "2026-03-30T05:47:10.834Z",
+      "updatedAt": "2026-03-30T05:47:10.834Z",
+      "variables": [],
+      "workspaceId": "ws-1774849630834-58mvf8"
+    },
+    {
+      "version": 1,
+      "id": "env-1774849694318-ptsk7e",
+      "name": "Globals",
+      "isGlobal": true,
+      "createdAt": "2026-03-30T05:48:14.318Z",
+      "updatedAt": "2026-03-30T05:48:14.318Z",
+      "variables": [],
+      "workspaceId": "ws-1774849694318-1njdxk"
+    },
+    {
+      "version": 1,
+      "id": "env-1774850057356-a4lbvf",
+      "name": "Globals",
+      "isGlobal": true,
+      "createdAt": "2026-03-30T05:54:17.356Z",
+      "updatedAt": "2026-03-30T05:54:17.356Z",
+      "variables": [],
+      "workspaceId": "ws-1774850057356-k1ze5b"
     }
   ],
   "apis": [],
   "flows": [],
   "mockServers": [],
-  "monitors": [],
-  "history": [],
+  "monitors": [
+    {
+      "version": 1,
+      "id": "mon-1774850408553-cmq88q",
+      "name": "Monitor 1",
+      "region": "us-east-1",
+      "status": "paused",
+      "uptime": 100,
+      "lastRun": "never",
+      "idPrefix": "mon",
+      "schedule": "*/5 * * * *",
+      "createdAt": "2026-03-30T06:00:08.553Z",
+      "totalRuns": 0,
+      "updatedAt": "2026-03-30T06:00:08.553Z",
+      "failedRuns": 0,
+      "recentRuns": [],
+      "lastFailure": "Never",
+      "workspaceId": "ws-1774849694318-1njdxk",
+      "avgResponseTime": 0
+    }
+  ],
+  "history": [
+    {
+      "id": "hist-1774849904616-m5b2xt",
+      "url": " https://postman-echo.com/post",
+      "time": 795,
+      "method": "POST",
+      "status": 200,
+      "timestamp": "2026-03-30T05:51:44.616Z",
+      "workspaceId": "ws-1774849694318-1njdxk"
+    },
+    {
+      "id": "hist-1774849875759-r9skm3",
+      "url": "https://postman-echo.com/get?ping=1",
+      "time": 919,
+      "method": "GET",
+      "status": 200,
+      "timestamp": "2026-03-30T05:51:15.759Z",
+      "workspaceId": "ws-1774849694318-1njdxk"
+    },
+    {
+      "id": "hist-1774849632864-twiytl",
+      "url": "https://postman-echo.com/post",
+      "time": 706,
+      "method": "POST",
+      "status": 200,
+      "timestamp": "2026-03-30T05:47:12.864Z",
+      "workspaceId": "ws-1774849630834-58mvf8"
+    },
+    {
+      "id": "hist-1774849632091-pos95i",
+      "url": "https://postman-echo.com/get?ok=1",
+      "time": 1104,
+      "method": "GET",
+      "status": 200,
+      "timestamp": "2026-03-30T05:47:12.091Z",
+      "workspaceId": "ws-1774849630834-58mvf8"
+    },
+    {
+      "id": "hist-1774849492478-l8ud0e",
+      "url": "https://postman-echo.com/post",
+      "time": 751,
+      "method": "POST",
+      "status": 200,
+      "timestamp": "2026-03-30T05:44:52.478Z",
+      "workspaceId": "ws-default"
+    },
+    {
+      "id": "hist-1774849491656-m7epdn",
+      "url": "https://postman-echo.com/get?fix=1",
+      "time": 921,
+      "method": "GET",
+      "status": 200,
+      "timestamp": "2026-03-30T05:44:51.656Z",
+      "workspaceId": "ws-default"
+    },
+    {
+      "id": "hist-1774849250955-t7tqur",
+      "url": "https://postman-echo.com/post",
+      "time": 664,
+      "method": "POST",
+      "status": 200,
+      "timestamp": "2026-03-30T05:40:50.955Z",
+      "workspaceId": "ws-default"
+    },
+    {
+      "id": "hist-1774849242414-1393o2",
+      "url": "https://postman-echo.com/get?x=1",
+      "time": 1026,
+      "method": "GET",
+      "status": 200,
+      "timestamp": "2026-03-30T05:40:42.414Z",
+      "workspaceId": "ws-default"
+    }
+  ],
   "settings": {
     "workspace": {},
     "user": {}

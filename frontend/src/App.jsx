@@ -18,6 +18,7 @@ import APIsPage from './components/pages/APIsPage'
 import MockServersPage from './components/pages/MockServersPage'
 import MonitorsPage from './components/pages/MonitorsPage'
 import SettingsPage from './components/pages/SettingsPage'
+import SystemDesignPage from './features/systemDesign/SystemDesignPage'
 
 function AuthScreen() {
   const { signInWithPassword, signUpWithPassword, authError, clearAuthError } = useApp()
@@ -171,6 +172,7 @@ function PostFlowApp() {
           {activePage === 'home' && <HomePage />}
           {activePage === 'flows' && <FlowsPage />}
           {activePage === 'apis' && <APIsPage />}
+          {activePage === 'systemDesign' && <SystemDesignPage />}
           {activePage === 'mocks' && <MockServersPage />}
           {activePage === 'monitors' && <MonitorsPage />}
           {activePage === 'settings' && <SettingsPage />}

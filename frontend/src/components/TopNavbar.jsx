@@ -32,6 +32,7 @@ export default function TopNavbar() {
     { id: 'home',     label: 'Home',      icon: Home },
     { id: 'apis',     label: 'APIs',      icon: Code2 },
     { id: 'flows',    label: 'Flows',     icon: Zap },
+    { id: 'systemDesign', label: 'System Design', icon: Server },
     { id: 'monitors', label: 'Monitors',  icon: Activity },
     { id: 'mocks',    label: 'Mocks',     icon: Server },
   ]

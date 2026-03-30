@@ -366,19 +366,37 @@ function HistoryPanel() {
   )
 }
 
+function SystemDesignPanel({ onOpen }) {
+  return (
+    <div className="p-4 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-[#CCCCCC]">System Design</p>
+      </div>
+      <p className="text-xs text-[#8A8A8A]">Stream architecture JSON with the analyzer.</p>
+      <button
+        onClick={onOpen}
+        className="w-full h-9 rounded bg-[#FF6C37] text-white text-xs font-semibold hover:bg-[#e05d2f]"
+      >
+        Open Analyzer
+      </button>
+    </div>
+  )
+}
+
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 const SIDEBAR_ICONS = [
   { id: 'collections', icon: FolderOpen, label: 'Collections' },
   { id: 'apis',        icon: Code2,      label: 'APIs' },
   { id: 'environments',icon: Sliders,    label: 'Environments' },
+  { id: 'systemDesign',icon: Activity,   label: 'System Design' },
   { id: 'mock',        icon: Server,     label: 'Mock Servers' },
   { id: 'monitors',    icon: Activity,   label: 'Monitors' },
   { id: 'history',     icon: Clock,      label: 'History' },
 ]
 
 export default function LeftSidebar() {
-  const { sidePanel, setSidePanel } = useApp()
+  const { sidePanel, setSidePanel, setActivePage } = useApp()
   const togglePanel = (id) => setSidePanel(prev => prev === id ? null : id)
 
   return (
@@ -418,6 +436,7 @@ export default function LeftSidebar() {
           {sidePanel === 'collections'  && <CollectionsPanel />}
           {sidePanel === 'apis'         && <APIsPanel />}
           {sidePanel === 'environments' && <EnvironmentsPanel />}
+          {sidePanel === 'systemDesign' && <SystemDesignPanel onOpen={() => setActivePage('systemDesign')} />}
           {sidePanel === 'mock'         && <MockServersPanel />}
           {sidePanel === 'monitors'     && <MonitorsPanel />}
           {sidePanel === 'history'      && <HistoryPanel />}

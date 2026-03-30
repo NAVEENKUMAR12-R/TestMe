@@ -7,6 +7,7 @@ const path = require('path');
 const vm = require('vm');
 const https = require('https');
 const { Pool } = require('pg');
+const systemDesignRoutes = require('./routes/systemDesignRoutes');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -869,6 +870,8 @@ async function executeRequest({ store, workspaceId, request, environmentId, disa
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'postflow-backend', time: new Date().toISOString() });
 });
+
+app.use('/api/system-design', systemDesignRoutes({ loadStore, requireWorkspaceAccess, publishEvent, auditEvent, getUser, createId, pool }));
 
 app.get('/api/bootstrap', (req, res, next) => {
   try {

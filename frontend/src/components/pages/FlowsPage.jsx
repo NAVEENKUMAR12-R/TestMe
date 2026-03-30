@@ -85,26 +85,68 @@ function FlowCard({ flow }) {
   )
 }
 
-function FlowBuilder({ flow, onClose }) {
+function FlowBuilder({ flow, onClose, onFlowChange }) {
+  const { runFlow, updateFlow } = useApp()
   const [running, setRunning] = useState(false)
   const [runResults, setRunResults] = useState(null)
   const [selectedNode, setSelectedNode] = useState(null)
+  const [runError, setRunError] = useState('')
+  const nodes = Array.isArray(flow.nodes) ? flow.nodes : []
 
-  const handleRun = () => {
+  const handleRun = async () => {
     setRunning(true)
+    setRunError('')
     setRunResults(null)
-    setTimeout(() => {
-      setRunning(false)
+
+    try {
+      const data = await runFlow(flow.id)
       setRunResults({
-        success: true,
-          steps: flow.nodes.map((n) => ({
-          node: n,
-          status: Math.random() > 0.1 ? 'pass' : 'fail',
-          duration: Math.floor(Math.random() * 300) + 50,
-          output: n.type === 'request' ? { status: 200, body: '{ "id": 1, "data": "..." }' } : { result: 'Script executed' }
-        }))
+        success: data.passed,
+        steps: nodes.map((node) => {
+          const resNode = data.results?.[node.id] || {}
+          return {
+            node,
+            status: resNode.status === 'success' ? 'pass' : 'fail',
+            duration: resNode.time || 0,
+            output: node.type === 'request'
+              ? { status: resNode.responseCode || 0, body: resNode.body || '' }
+              : { result: 'Step executed' },
+          }
+        }),
       })
-    }, 1800)
+    } catch (err) {
+      console.error(err)
+      setRunError(err.message || 'Failed to run flow')
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  const handleAddNode = async () => {
+    const nextNodes = [
+      ...nodes,
+      { id: `node-${Date.now()}`, type: 'request', label: `Step ${nodes.length + 1}`, method: 'GET' },
+    ]
+    try {
+      const updated = await updateFlow(flow.id, { nodes: nextNodes })
+      if (onFlowChange) {
+        onFlowChange(updated || { ...flow, nodes: nextNodes })
+      }
+    } catch (error) {
+      console.error('Failed to add node', error)
+    }
+  }
+
+  const handleLabelBlur = async (nodeId, value) => {
+    const label = (value || '').trim()
+    if (!label) return
+    const nextNodes = nodes.map(node => (node.id === nodeId ? { ...node, label } : node))
+    try {
+      const updated = await updateFlow(flow.id, { nodes: nextNodes })
+      onFlowChange?.(updated || { ...flow, nodes: nextNodes })
+    } catch (error) {
+      console.error('Failed to update node label', error)
+    }
   }
 
   return (
@@ -118,7 +160,10 @@ function FlowBuilder({ flow, onClose }) {
           <span className={`px-2 py-0.5 text-[10px] rounded-full ${flow.status === 'active' ? 'bg-[#49CC90]/15 text-[#49CC90]' : 'bg-[#3D3D3D] text-[#8D8D8D]'}`}>{flow.status}</span>
         </div>
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#CCCCCC] border border-[#3D3D3D] hover:border-[#5A5A5A] rounded-lg transition-colors">
+          <button
+            onClick={handleAddNode}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#CCCCCC] border border-[#3D3D3D] hover:border-[#5A5A5A] rounded-lg transition-colors"
+          >
             <Plus size={12} /> Add Node
           </button>
           <button
@@ -139,10 +184,10 @@ function FlowBuilder({ flow, onClose }) {
             backgroundSize: '28px 28px'
           }} />
           <div className="relative flex items-start gap-4 flex-wrap min-h-64">
-            {flow.nodes.map((node, i) => {
+            {nodes.map((node, i) => {
               const cfg = NODE_TYPE_CONFIG[node.type] || NODE_TYPE_CONFIG.request
               const Icon = cfg.icon
-              const result = runResults?.steps?.[i]
+              const result = runResults?.steps?.find(step => step.node.id === node.id)
               const isSelected = selectedNode === node.id
               return (
                 <div key={node.id} className="flex items-center gap-4">
@@ -208,7 +253,14 @@ function FlowBuilder({ flow, onClose }) {
                     <div className="space-y-2">
                       <div><label className="text-[10px] text-[#8D8D8D]">Type</label><div className="text-xs text-[#CCCCCC] capitalize">{node.type}</div></div>
                       {node.method && <div><label className="text-[10px] text-[#8D8D8D]">Method</label><div className="text-xs font-bold" style={{ color: METHOD_COLORS[node.method] }}>{node.method}</div></div>}
-                      <div><label className="text-[10px] text-[#8D8D8D]">Label</label><input className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded px-2 py-1 text-xs text-[#CCCCCC] outline-none focus:border-[#FF6C37]/50 mt-1" defaultValue={node.label} /></div>
+                      <div>
+                        <label className="text-[10px] text-[#8D8D8D]">Label</label>
+                        <input
+                          className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded px-2 py-1 text-xs text-[#CCCCCC] outline-none focus:border-[#FF6C37]/50 mt-1"
+                          defaultValue={node.label}
+                          onBlur={(e) => handleLabelBlur(node.id, e.target.value)}
+                        />
+                      </div>
                     </div>
                   </>
                 )
@@ -219,6 +271,9 @@ function FlowBuilder({ flow, onClose }) {
               <div className="text-[10px] text-[#5A5A5A] uppercase tracking-wider font-semibold">Run Results</div>
               {!runResults && !running && (
                 <p className="text-[11px] text-[#5A5A5A]">Click "Run Flow" to execute all steps and see results here.</p>
+              )}
+              {runError && !running && (
+                <div className="text-[11px] text-[#F93E3E]">{runError}</div>
               )}
               {running && (
                 <div className="flex items-center gap-2 text-xs text-[#FCA130]">
@@ -267,7 +322,7 @@ export default function FlowsPage() {
   }
 
   if (selectedFlow) {
-    return <FlowBuilder flow={selectedFlow} onClose={() => setSelectedFlow(null)} />
+    return <FlowBuilder flow={selectedFlow} onClose={() => setSelectedFlow(null)} onFlowChange={setSelectedFlow} />
   }
 
   return (

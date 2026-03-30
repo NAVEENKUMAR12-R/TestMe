@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import { X, Users, Mail, Crown, Edit2, Eye, Trash2, Shield, Plus, Check, UserPlus } from 'lucide-react'
 
@@ -15,19 +15,64 @@ const STATUS_DOTS = {
 }
 
 export default function TeamModal() {
-  const { activeWorkspace, closeModal, inviteMember, updateMemberRole, removeMember } = useApp()
+  const {
+    activeWorkspace,
+    closeModal,
+    inviteMember,
+    updateMemberRole,
+    removeMember,
+    updateWorkspaceMeta,
+    deleteWorkspace,
+  } = useApp()
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('editor')
   const [inviteSent, setInviteSent] = useState(false)
   const [tab, setTab] = useState('members') // members | settings
+  const [workspaceName, setWorkspaceName] = useState(activeWorkspace?.name || '')
+  const [workspaceDescription, setWorkspaceDescription] = useState(activeWorkspace?.description || '')
+  const [savingWorkspace, setSavingWorkspace] = useState(false)
 
   if (!activeWorkspace) return null
 
-  const handleInvite = () => {
+  useEffect(() => {
+    setWorkspaceName(activeWorkspace.name)
+    setWorkspaceDescription(activeWorkspace.description || '')
+  }, [activeWorkspace])
+
+  const handleInvite = async () => {
     if (!inviteEmail.trim() || !inviteEmail.includes('@')) return
-    inviteMember(activeWorkspace.id, inviteEmail.trim())
-    setInviteSent(true)
-    setTimeout(() => { setInviteSent(false); setInviteEmail('') }, 2000)
+    try {
+      await inviteMember(activeWorkspace.id, inviteEmail.trim(), inviteRole)
+      setInviteSent(true)
+      setTimeout(() => { setInviteSent(false); setInviteEmail('') }, 2000)
+    } catch (error) {
+      console.error('Failed to invite member', error)
+    }
+  }
+
+  const handleSaveWorkspace = async () => {
+    if (!workspaceName.trim()) return
+    setSavingWorkspace(true)
+    try {
+      await updateWorkspaceMeta(activeWorkspace.id, {
+        name: workspaceName.trim(),
+        description: workspaceDescription,
+      })
+    } catch (error) {
+      console.error('Failed to update workspace', error)
+    } finally {
+      setSavingWorkspace(false)
+    }
+  }
+
+  const handleDeleteWorkspace = async () => {
+    if (!window.confirm(`Delete workspace "${activeWorkspace.name}"? This cannot be undone.`)) return
+    try {
+      await deleteWorkspace(activeWorkspace.id)
+      closeModal('team')
+    } catch (error) {
+      console.error('Failed to delete workspace', error)
+    }
   }
 
   return (
@@ -202,29 +247,38 @@ export default function TeamModal() {
 
           {tab === 'settings' && (
             <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs text-[#8D8D8D]">Workspace name</label>
-                <input
-                  defaultValue={activeWorkspace.name}
-                  className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 py-2 text-sm text-[#CCCCCC] outline-none focus:border-[#FF6C37]/50"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-[#8D8D8D]">Description</label>
-                <textarea
-                  defaultValue={activeWorkspace.description}
-                  rows={3}
-                  className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 py-2 text-sm text-[#CCCCCC] outline-none focus:border-[#FF6C37]/50 resize-none"
-                />
-              </div>
-              <div className="flex gap-3">
-                <button className="px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors">
-                  Save Changes
-                </button>
-                <button className="px-4 py-2 text-xs font-medium text-[#F93E3E] border border-[#F93E3E]/30 hover:bg-[#F93E3E]/10 rounded-lg transition-colors">
-                  Delete Workspace
-                </button>
-              </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-[#8D8D8D]">Workspace name</label>
+                  <input
+                    value={workspaceName}
+                    onChange={e => setWorkspaceName(e.target.value)}
+                    className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 py-2 text-sm text-[#CCCCCC] outline-none focus:border-[#FF6C37]/50"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-[#8D8D8D]">Description</label>
+                  <textarea
+                    value={workspaceDescription}
+                    onChange={e => setWorkspaceDescription(e.target.value)}
+                    rows={3}
+                    className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 py-2 text-sm text-[#CCCCCC] outline-none focus:border-[#FF6C37]/50 resize-none"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleSaveWorkspace}
+                    className="px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors disabled:opacity-50"
+                    disabled={savingWorkspace || !workspaceName.trim()}
+                  >
+                    {savingWorkspace ? 'Saving...' : 'Save Changes'}
+                  </button>
+                  <button
+                    onClick={handleDeleteWorkspace}
+                    className="px-4 py-2 text-xs font-medium text-[#F93E3E] border border-[#F93E3E]/30 hover:bg-[#F93E3E]/10 rounded-lg transition-colors"
+                  >
+                    Delete Workspace
+                  </button>
+                </div>
             </div>
           )}
         </div>

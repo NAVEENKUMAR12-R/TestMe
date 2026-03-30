@@ -378,6 +378,25 @@ app.use(async (req, res, next) => {
 const ROLE_RANK = { viewer: 1, editor: 2, admin: 3, owner: 4 };
 const sseClients = new Set();
 
+class ApiError extends Error {
+  constructor(status, message, code = 'ERR_INTERNAL', details = {}) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
+
+function validatePayload(requiredFields = []) {
+  return (req, res, next) => {
+    const missing = requiredFields.filter((f) => req.body[f] === undefined || req.body[f] === null || req.body[f] === '');
+    if (missing.length > 0) {
+      return next(new ApiError(400, 'Validation failed. Missing required fields.', 'ERR_VALIDATION', { missingFields: missing }));
+    }
+    next();
+  };
+}
+
 function createId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -424,6 +443,10 @@ function defaultStore() {
     mockServers: [],
     monitors: [],
     history: [],
+    settings: {
+      workspace: {},
+      user: {},
+    },
   };
 }
 
@@ -439,6 +462,10 @@ function ensureStoreShape(data) {
     mockServers: Array.isArray(data?.mockServers) ? data.mockServers.map(withVersion) : [],
     monitors: Array.isArray(data?.monitors) ? data.monitors.map(withVersion) : [],
     history: Array.isArray(data?.history) ? data.history : [],
+    settings: {
+      workspace: data?.settings?.workspace && typeof data.settings.workspace === 'object' ? data.settings.workspace : {},
+      user: data?.settings?.user && typeof data.settings.user === 'object' ? data.settings.user : {},
+    },
   };
 }
 
@@ -535,9 +562,7 @@ function canAccess(workspace, userId, minimumRole = 'viewer') {
 function ensureEntityAccess(req, workspace, minimumRole = 'viewer') {
   const user = getUser(req);
   if (!canAccess(workspace, user.id, minimumRole)) {
-    const error = new Error('Insufficient role');
-    error.status = 403;
-    throw error;
+    throw new ApiError(403, 'Insufficient role', 'ERR_INSUFFICIENT_ROLE', { required: minimumRole });
   }
   return user;
 }
@@ -545,9 +570,7 @@ function ensureEntityAccess(req, workspace, minimumRole = 'viewer') {
 function requireWorkspace(store, workspaceId) {
   const workspace = store.workspaces.find((w) => w.id === workspaceId);
   if (!workspace) {
-    const error = new Error('Workspace not found');
-    error.status = 404;
-    throw error;
+    throw new ApiError(404, 'Workspace not found', 'ERR_NOT_FOUND', { entityType: 'workspace', id: workspaceId });
   }
   return workspace;
 }
@@ -568,11 +591,7 @@ function checkVersion(entity, expectedVersion) {
   const normalized = Number(expectedVersion);
   if (!Number.isFinite(normalized)) return;
   if (Number(entity.version || 1) !== normalized) {
-    const error = new Error('Version conflict detected');
-    error.status = 409;
-    error.code = 'version_conflict';
-    error.currentVersion = Number(entity.version || 1);
-    throw error;
+    throw new ApiError(409, 'Version conflict detected', 'ERR_VERSION_CONFLICT', { currentVersion: Number(entity.version || 1), expectedVersion: normalized });
   }
 }
 
@@ -851,154 +870,240 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'postflow-backend', time: new Date().toISOString() });
 });
 
-app.get('/api/bootstrap', (req, res) => {
-  const store = loadStore();
-  const accessible = listAccessibleWorkspaces(store, req, 'viewer');
-  if (accessible.length === 0) {
-    return res.status(403).json({ error: 'No accessible workspace found for this user' });
+app.get('/api/bootstrap', (req, res, next) => {
+  try {
+    const store = loadStore();
+    const accessible = listAccessibleWorkspaces(store, req, 'viewer');
+    if (accessible.length === 0) {
+      throw new ApiError(403, 'No accessible workspace found for this user', 'ERR_FORBIDDEN');
+    }
+
+    const requestedWorkspaceId = req.query.workspaceId;
+    const workspace = requestedWorkspaceId
+      ? accessible.find((w) => w.id === requestedWorkspaceId)
+      : accessible[0];
+
+    if (!workspace) {
+      throw new ApiError(403, 'Workspace access denied', 'ERR_FORBIDDEN');
+    }
+
+    res.json({
+      workspace,
+      workspaces: accessible,
+      collections: store.collections.filter((c) => c.workspaceId === workspace.id),
+      environments: store.environments.filter((e) => e.workspaceId === workspace.id),
+      apis: store.apis.filter((a) => a.workspaceId === workspace.id),
+      flows: store.flows.filter((f) => f.workspaceId === workspace.id),
+      mockServers: store.mockServers.filter((m) => m.workspaceId === workspace.id),
+      monitors: store.monitors.filter((m) => m.workspaceId === workspace.id),
+      history: store.history.filter((h) => h.workspaceId === workspace.id),
+      settings: store.settings,
+    });
+  } catch (error) {
+    next(error);
   }
+});
 
-  const requestedWorkspaceId = req.query.workspaceId;
-  const workspace = requestedWorkspaceId
-    ? accessible.find((w) => w.id === requestedWorkspaceId)
-    : accessible[0];
-
-  if (!workspace) {
-    return res.status(403).json({ error: 'Workspace access denied' });
+app.get('/api/workspaces', (req, res, next) => {
+  try {
+    const store = loadStore();
+    res.json(listAccessibleWorkspaces(store, req, 'viewer'));
+  } catch (error) {
+    next(error);
   }
-
-  res.json({
-    workspace,
-    workspaces: accessible,
-    collections: store.collections.filter((c) => c.workspaceId === workspace.id),
-    environments: store.environments.filter((e) => e.workspaceId === workspace.id),
-    apis: store.apis.filter((a) => a.workspaceId === workspace.id),
-    flows: store.flows.filter((f) => f.workspaceId === workspace.id),
-    mockServers: store.mockServers.filter((m) => m.workspaceId === workspace.id),
-    monitors: store.monitors.filter((m) => m.workspaceId === workspace.id),
-    history: store.history.filter((h) => h.workspaceId === workspace.id),
-  });
 });
 
-app.get('/api/workspaces', (req, res) => {
-  const store = loadStore();
-  res.json(listAccessibleWorkspaces(store, req, 'viewer'));
-});
-
-app.post('/api/workspaces', (req, res) => {
-  const store = loadStore();
-  const user = getUser(req);
-  const userName = user.name || user.email?.split('@')[0] || 'You';
-  const ws = {
-    id: createId('ws'),
-    name: req.body.name || 'Untitled Workspace',
-    type: req.body.type || 'personal',
-    description: req.body.description || '',
-    members: [
-      {
-        id: user.id,
-        name: userName,
-        email: user.email,
-        role: 'owner',
-        initials: userName.slice(0, 2).toUpperCase(),
-        color: '#FF6C37',
-        status: 'online',
-      },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  store.workspaces.push(ws);
-  store.environments.push({
-    id: createId('env'),
-    workspaceId: ws.id,
-    name: 'Globals',
-    isGlobal: true,
-    variables: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
-  saveStore(store);
-  auditEvent(req, 'workspace.created', ws.id, 'workspace', ws.id, { name: ws.name, type: ws.type });
-  publishEvent('workspace.created', { workspaceId: ws.id, workspace: ws });
-  res.status(201).json(ws);
-});
-
-app.post('/api/workspaces/:workspaceId/members', (req, res) => {
-  const store = loadStore();
-  const workspace = store.workspaces.find((w) => w.id === req.params.workspaceId);
-  if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
-
-  const user = getUser(req);
-  if (!canAccess(workspace, user.id, 'admin')) {
-    return res.status(403).json({ error: 'Insufficient role to invite members' });
+app.post('/api/workspaces', validatePayload(['name']), (req, res, next) => {
+  try {
+    const store = loadStore();
+    const user = getUser(req);
+    const userName = user.name || user.email?.split('@')[0] || 'You';
+    const ws = {
+      id: createId('ws'),
+      name: req.body.name || 'Untitled Workspace',
+      type: req.body.type || 'personal',
+      description: req.body.description || '',
+      members: [
+        {
+          id: user.id,
+          name: userName,
+          email: user.email,
+          role: 'owner',
+          initials: userName.slice(0, 2).toUpperCase(),
+          color: '#FF6C37',
+          status: 'online',
+        },
+      ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    store.workspaces.push(ws);
+    store.environments.push({
+      id: createId('env'),
+      workspaceId: ws.id,
+      name: 'Globals',
+      isGlobal: true,
+      variables: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    saveStore(store);
+    auditEvent(req, 'workspace.created', ws.id, 'workspace', ws.id, { name: ws.name, type: ws.type });
+    publishEvent('workspace.created', { workspaceId: ws.id, workspace: ws });
+    res.status(201).json(ws);
+  } catch (error) {
+    next(error);
   }
-
-  const email = req.body.email;
-  if (!email) return res.status(400).json({ error: 'email is required' });
-
-  const existing = workspace.members.find((m) => m.email.toLowerCase() === email.toLowerCase());
-  if (existing) return res.status(409).json({ error: 'Member already exists' });
-
-  const member = {
-    id: createId('u'),
-    name: email.split('@')[0],
-    email,
-    role: req.body.role || 'viewer',
-    initials: email.slice(0, 2).toUpperCase(),
-    color: '#6C63FF',
-    status: 'online',
-  };
-  workspace.members.push(member);
-  workspace.updatedAt = new Date().toISOString();
-  saveStore(store);
-  auditEvent(req, 'workspace.member.invited', workspace.id, 'workspace_member', member.id, { email: member.email, role: member.role });
-  publishEvent('workspace.member.invited', { workspaceId: workspace.id, member });
-  res.status(201).json(member);
 });
 
-app.patch('/api/workspaces/:workspaceId/members/:memberId', (req, res) => {
-  const store = loadStore();
-  const workspace = store.workspaces.find((w) => w.id === req.params.workspaceId);
-  if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+app.patch('/api/workspaces/:workspaceId', (req, res, next) => {
+  try {
+    const store = loadStore();
+    const workspace = requireWorkspace(store, req.params.workspaceId);
+    ensureEntityAccess(req, workspace, 'admin');
 
-  const user = getUser(req);
-  if (!canAccess(workspace, user.id, 'admin')) {
-    return res.status(403).json({ error: 'Insufficient role to update member role' });
+    const updates = {};
+    if (typeof req.body.name === 'string' && req.body.name.trim()) {
+      updates.name = req.body.name.trim();
+    }
+    if (typeof req.body.description === 'string') {
+      updates.description = req.body.description;
+    }
+    if (typeof req.body.type === 'string') {
+      updates.type = req.body.type;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.json(workspace);
+    }
+
+    Object.assign(workspace, updates);
+    workspace.updatedAt = new Date().toISOString();
+    saveStore(store);
+    auditEvent(req, 'workspace.updated', workspace.id, 'workspace', workspace.id, updates);
+    publishEvent('workspace.updated', { workspaceId: workspace.id, workspace });
+    res.json(workspace);
+  } catch (error) {
+    next(error);
   }
-
-  const member = workspace.members.find((m) => m.id === req.params.memberId);
-  if (!member) return res.status(404).json({ error: 'Member not found' });
-
-  const role = req.body.role;
-  if (!ROLE_RANK[role]) return res.status(400).json({ error: 'Invalid role' });
-  member.role = role;
-  workspace.updatedAt = new Date().toISOString();
-  saveStore(store);
-  auditEvent(req, 'workspace.member.updated', workspace.id, 'workspace_member', member.id, { role: member.role });
-  publishEvent('workspace.member.updated', { workspaceId: workspace.id, member });
-  res.json(member);
 });
 
-app.delete('/api/workspaces/:workspaceId/members/:memberId', (req, res) => {
-  const store = loadStore();
-  const workspace = store.workspaces.find((w) => w.id === req.params.workspaceId);
-  if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+app.post('/api/workspaces/:workspaceId/members', validatePayload(['email']), (req, res, next) => {
+  try {
+    const store = loadStore();
+    const workspace = store.workspaces.find((w) => w.id === req.params.workspaceId);
+    if (!workspace) throw new ApiError(404, 'Workspace not found', 'ERR_NOT_FOUND', { id: req.params.workspaceId });
 
-  const user = getUser(req);
-  if (!canAccess(workspace, user.id, 'admin')) {
-    return res.status(403).json({ error: 'Insufficient role to remove member' });
+    const user = getUser(req);
+    if (!canAccess(workspace, user.id, 'admin')) {
+      throw new ApiError(403, 'Insufficient role to invite members', 'ERR_INSUFFICIENT_ROLE', { required: 'admin' });
+    }
+
+    const email = req.body.email;
+    const existing = workspace.members.find((m) => m.email.toLowerCase() === email.toLowerCase());
+    if (existing) throw new ApiError(409, 'Member already exists', 'ERR_CONFLICT');
+
+    const member = {
+      id: createId('u'),
+      name: email.split('@')[0],
+      email,
+      role: req.body.role || 'viewer',
+      initials: email.slice(0, 2).toUpperCase(),
+      color: '#6C63FF',
+      status: 'online',
+    };
+    workspace.members.push(member);
+    workspace.updatedAt = new Date().toISOString();
+    saveStore(store);
+    auditEvent(req, 'workspace.member.invited', workspace.id, 'workspace_member', member.id, { email: member.email, role: member.role });
+    publishEvent('workspace.member.invited', { workspaceId: workspace.id, member });
+    res.status(201).json(member);
+  } catch (error) {
+    next(error);
   }
-
-  workspace.members = workspace.members.filter((m) => m.id !== req.params.memberId);
-  workspace.updatedAt = new Date().toISOString();
-  saveStore(store);
-  auditEvent(req, 'workspace.member.removed', workspace.id, 'workspace_member', req.params.memberId, {});
-  publishEvent('workspace.member.removed', { workspaceId: workspace.id, memberId: req.params.memberId });
-  res.json({ ok: true });
 });
 
-app.post('/api/collections', (req, res) => {
+app.patch('/api/workspaces/:workspaceId/members/:memberId', validatePayload(['role']), (req, res, next) => {
+  try {
+    const store = loadStore();
+    const workspace = store.workspaces.find((w) => w.id === req.params.workspaceId);
+    if (!workspace) throw new ApiError(404, 'Workspace not found', 'ERR_NOT_FOUND', { id: req.params.workspaceId });
+
+    const user = getUser(req);
+    if (!canAccess(workspace, user.id, 'admin')) {
+      throw new ApiError(403, 'Insufficient role to update member role', 'ERR_INSUFFICIENT_ROLE', { required: 'admin' });
+    }
+
+    const member = workspace.members.find((m) => m.id === req.params.memberId);
+    if (!member) throw new ApiError(404, 'Member not found', 'ERR_NOT_FOUND', { id: req.params.memberId });
+
+    const role = req.body.role;
+    if (!ROLE_RANK[role]) throw new ApiError(400, 'Invalid role', 'ERR_VALIDATION');
+    
+    member.role = role;
+    workspace.updatedAt = new Date().toISOString();
+    saveStore(store);
+    auditEvent(req, 'workspace.member.updated', workspace.id, 'workspace_member', member.id, { role: member.role });
+    publishEvent('workspace.member.updated', { workspaceId: workspace.id, member });
+    res.json(member);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/workspaces/:workspaceId/members/:memberId', (req, res, next) => {
+  try {
+    const store = loadStore();
+    const workspace = store.workspaces.find((w) => w.id === req.params.workspaceId);
+    if (!workspace) throw new ApiError(404, 'Workspace not found', 'ERR_NOT_FOUND', { id: req.params.workspaceId });
+
+    const user = getUser(req);
+    if (!canAccess(workspace, user.id, 'admin')) {
+      throw new ApiError(403, 'Insufficient role to remove member', 'ERR_INSUFFICIENT_ROLE', { required: 'admin' });
+    }
+
+    workspace.members = workspace.members.filter((m) => m.id !== req.params.memberId);
+    workspace.updatedAt = new Date().toISOString();
+    saveStore(store);
+    auditEvent(req, 'workspace.member.removed', workspace.id, 'workspace_member', req.params.memberId, {});
+    publishEvent('workspace.member.removed', { workspaceId: workspace.id, memberId: req.params.memberId });
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/workspaces/:workspaceId', (req, res, next) => {
+  try {
+    const store = loadStore();
+    const workspace = store.workspaces.find((w) => w.id === req.params.workspaceId);
+    if (!workspace) throw new ApiError(404, 'Workspace not found', 'ERR_NOT_FOUND', { id: req.params.workspaceId });
+
+    const user = getUser(req);
+    if (!canAccess(workspace, user.id, 'owner')) {
+      throw new ApiError(403, 'Only owners can delete workspaces', 'ERR_INSUFFICIENT_ROLE', { required: 'owner' });
+    }
+
+    // Clean up all nested entities
+    store.collections = store.collections.filter((c) => c.workspaceId !== workspace.id);
+    store.environments = store.environments.filter((e) => e.workspaceId !== workspace.id);
+    store.apis = store.apis.filter((a) => a.workspaceId !== workspace.id);
+    store.flows = store.flows.filter((f) => f.workspaceId !== workspace.id);
+    store.mockServers = store.mockServers.filter((m) => m.workspaceId !== workspace.id);
+    store.monitors = store.monitors.filter((m) => m.workspaceId !== workspace.id);
+    store.history = store.history.filter((h) => h.workspaceId !== workspace.id);
+    store.workspaces = store.workspaces.filter((w) => w.id !== workspace.id);
+
+    saveStore(store);
+    auditEvent(req, 'workspace.deleted', workspace.id, 'workspace', workspace.id, {});
+    publishEvent('workspace.deleted', { workspaceId: workspace.id });
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/collections', validatePayload(['workspaceId']), (req, res, next) => {
   try {
     const store = loadStore();
     const workspaceId = req.body.workspaceId;
@@ -1016,21 +1121,22 @@ app.post('/api/collections', (req, res) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-      store.collections.push(collection);
-      saveStore(store);
-      auditEvent(req, 'collection.created', workspaceId, 'collection', collection.id, { name: collection.name });
-      publishEvent('collection.created', { workspaceId, collection });
-      res.status(201).json(collection);
+    store.collections.push(collection);
+    saveStore(store);
+    auditEvent(req, 'collection.created', workspaceId, 'collection', collection.id, { name: collection.name });
+    publishEvent('collection.created', { workspaceId, collection });
+    res.status(201).json(collection);
   } catch (error) {
-    res.status(error.status || 500).json({ error: error.message, code: error.code });
+    next(error);
   }
 });
 
-app.patch('/api/collections/:collectionId', (req, res) => {
+app.patch('/api/collections/:collectionId', (req, res, next) => {
   try {
     const store = loadStore();
     const collection = store.collections.find((c) => c.id === req.params.collectionId);
-    if (!collection) return res.status(404).json({ error: 'Collection not found' });
+    if (!collection) throw new ApiError(404, 'Collection not found', 'ERR_NOT_FOUND', { id: req.params.collectionId });
+    
     const workspace = requireWorkspace(store, collection.workspaceId);
     ensureEntityAccess(req, workspace, 'editor');
     checkVersion(collection, req.body.version);
@@ -1041,36 +1147,37 @@ app.patch('/api/collections/:collectionId', (req, res) => {
       expanded: req.body.expanded ?? collection.expanded,
       items: Array.isArray(req.body.items) ? req.body.items : collection.items,
     });
-      bumpEntity(collection);
-      saveStore(store);
-      auditEvent(req, 'collection.updated', collection.workspaceId, 'collection', collection.id, { name: collection.name, version: collection.version });
-      publishEvent('collection.updated', { workspaceId: collection.workspaceId, collection });
-      res.json(collection);
+    bumpEntity(collection);
+    saveStore(store);
+    auditEvent(req, 'collection.updated', collection.workspaceId, 'collection', collection.id, { name: collection.name, version: collection.version });
+    publishEvent('collection.updated', { workspaceId: collection.workspaceId, collection });
+    res.json(collection);
   } catch (error) {
-    res.status(error.status || 500).json({ error: error.message, code: error.code, currentVersion: error.currentVersion });
+    next(error);
   }
 });
 
-app.delete('/api/collections/:collectionId', (req, res) => {
+app.delete('/api/collections/:collectionId', (req, res, next) => {
   try {
     const store = loadStore();
     const existing = store.collections.find((c) => c.id === req.params.collectionId);
-    if (!existing) return res.status(404).json({ error: 'Collection not found' });
+    if (!existing) throw new ApiError(404, 'Collection not found', 'ERR_NOT_FOUND', { id: req.params.collectionId });
+    
     const workspace = requireWorkspace(store, existing.workspaceId);
     ensureEntityAccess(req, workspace, 'editor');
     checkVersion(existing, req.body?.version || req.query.version);
 
-      store.collections = store.collections.filter((c) => c.id !== req.params.collectionId);
-      saveStore(store);
-      auditEvent(req, 'collection.deleted', existing.workspaceId, 'collection', existing.id, { name: existing.name });
-      publishEvent('collection.deleted', { workspaceId: existing.workspaceId, collectionId: existing.id });
-      res.json({ ok: true });
+    store.collections = store.collections.filter((c) => c.id !== req.params.collectionId);
+    saveStore(store);
+    auditEvent(req, 'collection.deleted', existing.workspaceId, 'collection', existing.id, { name: existing.name });
+    publishEvent('collection.deleted', { workspaceId: existing.workspaceId, collectionId: existing.id });
+    res.json({ ok: true });
   } catch (error) {
-    res.status(error.status || 500).json({ error: error.message, code: error.code, currentVersion: error.currentVersion });
+    next(error);
   }
 });
 
-app.post('/api/environments', (req, res) => {
+app.post('/api/environments', validatePayload(['workspaceId']), (req, res, next) => {
   try {
     const store = loadStore();
     const workspace = requireWorkspace(store, req.body.workspaceId);
@@ -1086,21 +1193,22 @@ app.post('/api/environments', (req, res) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-      store.environments.push(environment);
-      saveStore(store);
-      auditEvent(req, 'environment.created', environment.workspaceId, 'environment', environment.id, { name: environment.name });
-      publishEvent('environment.created', { workspaceId: environment.workspaceId, environment });
-      res.status(201).json(environment);
+    store.environments.push(environment);
+    saveStore(store);
+    auditEvent(req, 'environment.created', environment.workspaceId, 'environment', environment.id, { name: environment.name });
+    publishEvent('environment.created', { workspaceId: environment.workspaceId, environment });
+    res.status(201).json(environment);
   } catch (error) {
-    res.status(error.status || 500).json({ error: error.message, code: error.code });
+    next(error);
   }
 });
 
-app.patch('/api/environments/:environmentId', (req, res) => {
+app.patch('/api/environments/:environmentId', (req, res, next) => {
   try {
     const store = loadStore();
     const environment = store.environments.find((e) => e.id === req.params.environmentId);
-    if (!environment) return res.status(404).json({ error: 'Environment not found' });
+    if (!environment) throw new ApiError(404, 'Environment not found', 'ERR_NOT_FOUND', { id: req.params.environmentId });
+    
     const workspace = requireWorkspace(store, environment.workspaceId);
     ensureEntityAccess(req, workspace, 'editor');
     checkVersion(environment, req.body.version);
@@ -1110,20 +1218,44 @@ app.patch('/api/environments/:environmentId', (req, res) => {
       variables: Array.isArray(req.body.variables) ? req.body.variables : environment.variables,
     });
 
-      bumpEntity(environment);
-      saveStore(store);
-      auditEvent(req, 'environment.updated', environment.workspaceId, 'environment', environment.id, { name: environment.name, version: environment.version });
-      publishEvent('environment.updated', { workspaceId: environment.workspaceId, environment });
-      res.json(environment);
+    bumpEntity(environment);
+    saveStore(store);
+    auditEvent(req, 'environment.updated', environment.workspaceId, 'environment', environment.id, { name: environment.name, version: environment.version });
+    publishEvent('environment.updated', { workspaceId: environment.workspaceId, environment });
+    res.json(environment);
   } catch (error) {
-    res.status(error.status || 500).json({ error: error.message, code: error.code, currentVersion: error.currentVersion });
+    next(error);
   }
 });
 
-function upsertWorkspaceEntity({ req, res, store, listName, entityId, minRole = 'editor', defaults = {}, eventBase }) {
+app.delete('/api/environments/:environmentId', (req, res, next) => {
+  try {
+    const store = loadStore();
+    const existing = store.environments.find((e) => e.id === req.params.environmentId);
+    if (!existing) throw new ApiError(404, 'Environment not found', 'ERR_NOT_FOUND', { id: req.params.environmentId });
+    
+    const workspace = requireWorkspace(store, existing.workspaceId);
+    ensureEntityAccess(req, workspace, 'editor');
+
+    if (existing.isGlobal) {
+      throw new ApiError(403, 'Global environments cannot be deleted', 'ERR_VALIDATION');
+    }
+
+    store.environments = store.environments.filter((e) => e.id !== req.params.environmentId);
+    saveStore(store);
+    auditEvent(req, 'environment.deleted', existing.workspaceId, 'environment', existing.id, { name: existing.name });
+    publishEvent('environment.deleted', { workspaceId: existing.workspaceId, environmentId: existing.id });
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+function upsertWorkspaceEntity({ req, res, next, store, listName, entityId, minRole = 'editor', defaults = {}, eventBase }) {
   try {
     const isCreate = !entityId;
     if (isCreate) {
+      if (!req.body.workspaceId) throw new ApiError(400, 'workspaceId is required', 'ERR_VALIDATION');
       const workspace = requireWorkspace(store, req.body.workspaceId);
       ensureEntityAccess(req, workspace, minRole);
       const entity = {
@@ -1146,7 +1278,8 @@ function upsertWorkspaceEntity({ req, res, store, listName, entityId, minRole = 
     }
 
     const entity = store[listName].find((item) => item.id === entityId);
-    if (!entity) return res.status(404).json({ error: `${eventBase} not found` });
+    if (!entity) throw new ApiError(404, `${eventBase} not found`, 'ERR_NOT_FOUND', { id: entityId });
+    
     const workspace = requireWorkspace(store, entity.workspaceId);
     ensureEntityAccess(req, workspace, minRole);
     checkVersion(entity, req.body.version);
@@ -1160,15 +1293,32 @@ function upsertWorkspaceEntity({ req, res, store, listName, entityId, minRole = 
     publishEvent(`${eventBase}.updated`, { workspaceId: workspace.id, entity });
     return res.json(entity);
   } catch (error) {
-    return res.status(error.status || 500).json({ error: error.message, code: error.code, currentVersion: error.currentVersion });
+    next(error);
   }
 }
 
-app.post('/api/apis', (req, res) => {
+function deleteWorkspaceEntity({ req, res, next, store, listName, entityId, minRole = 'editor', eventBase }) {
+  try {
+    const existing = store[listName].find((item) => item.id === entityId);
+    if (!existing) throw new ApiError(404, `${eventBase} not found`, 'ERR_NOT_FOUND', { id: entityId });
+    
+    const workspace = requireWorkspace(store, existing.workspaceId);
+    ensureEntityAccess(req, workspace, minRole);
+
+    store[listName] = store[listName].filter((item) => item.id !== entityId);
+    saveStore(store);
+    auditEvent(req, `${eventBase}.deleted`, existing.workspaceId, eventBase, existing.id, { name: existing.name });
+    publishEvent(`${eventBase}.deleted`, { workspaceId: existing.workspaceId, entityId: existing.id });
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+}
+
+app.post('/api/apis', (req, res, next) => {
   const store = loadStore();
   return upsertWorkspaceEntity({
-    req,
-    res,
+    req, res, next,
     store,
     listName: 'apis',
     defaults: {
@@ -1188,16 +1338,20 @@ app.post('/api/apis', (req, res) => {
   });
 });
 
-app.patch('/api/apis/:apiId', (req, res) => {
+app.patch('/api/apis/:apiId', (req, res, next) => {
   const store = loadStore();
-  return upsertWorkspaceEntity({ req, res, store, listName: 'apis', entityId: req.params.apiId, eventBase: 'api' });
+  return upsertWorkspaceEntity({ req, res, next, store, listName: 'apis', entityId: req.params.apiId, eventBase: 'api' });
 });
 
-app.post('/api/flows', (req, res) => {
+app.delete('/api/apis/:apiId', (req, res, next) => {
+  const store = loadStore();
+  return deleteWorkspaceEntity({ req, res, next, store, listName: 'apis', entityId: req.params.apiId, eventBase: 'api' });
+});
+
+app.post('/api/flows', (req, res, next) => {
   const store = loadStore();
   return upsertWorkspaceEntity({
-    req,
-    res,
+    req, res, next,
     store,
     listName: 'flows',
     defaults: { idPrefix: 'flow', name: 'New Flow', description: '', status: 'draft', nodes: [], totalRuns: 0, lastRun: 'never' },
@@ -1205,16 +1359,20 @@ app.post('/api/flows', (req, res) => {
   });
 });
 
-app.patch('/api/flows/:flowId', (req, res) => {
+app.patch('/api/flows/:flowId', (req, res, next) => {
   const store = loadStore();
-  return upsertWorkspaceEntity({ req, res, store, listName: 'flows', entityId: req.params.flowId, eventBase: 'flow' });
+  return upsertWorkspaceEntity({ req, res, next, store, listName: 'flows', entityId: req.params.flowId, eventBase: 'flow' });
 });
 
-app.post('/api/mock-servers', (req, res) => {
+app.delete('/api/flows/:flowId', (req, res, next) => {
+  const store = loadStore();
+  return deleteWorkspaceEntity({ req, res, next, store, listName: 'flows', entityId: req.params.flowId, eventBase: 'flow' });
+});
+
+app.post('/api/mock-servers', (req, res, next) => {
   const store = loadStore();
   return upsertWorkspaceEntity({
-    req,
-    res,
+    req, res, next,
     store,
     listName: 'mockServers',
     defaults: { idPrefix: 'mock', name: 'New Mock Server', status: 'active', isPublic: false, baseUrl: '', routes: [], calls: 0, callsLimit: 100000, errorRate: 0, environment: 'default' },
@@ -1222,16 +1380,20 @@ app.post('/api/mock-servers', (req, res) => {
   });
 });
 
-app.patch('/api/mock-servers/:mockServerId', (req, res) => {
+app.patch('/api/mock-servers/:mockServerId', (req, res, next) => {
   const store = loadStore();
-  return upsertWorkspaceEntity({ req, res, store, listName: 'mockServers', entityId: req.params.mockServerId, eventBase: 'mock-server' });
+  return upsertWorkspaceEntity({ req, res, next, store, listName: 'mockServers', entityId: req.params.mockServerId, eventBase: 'mock-server' });
 });
 
-app.post('/api/monitors', (req, res) => {
+app.delete('/api/mock-servers/:mockServerId', (req, res, next) => {
+  const store = loadStore();
+  return deleteWorkspaceEntity({ req, res, next, store, listName: 'mockServers', entityId: req.params.mockServerId, eventBase: 'mock-server' });
+});
+
+app.post('/api/monitors', (req, res, next) => {
   const store = loadStore();
   return upsertWorkspaceEntity({
-    req,
-    res,
+    req, res, next,
     store,
     listName: 'monitors',
     defaults: { idPrefix: 'mon', name: 'New Monitor', status: 'paused', schedule: '*/5 * * * *', region: 'us-east-1', uptime: 100, totalRuns: 0, failedRuns: 0, avgResponseTime: 0, lastRun: 'never', lastFailure: 'Never', recentRuns: [] },
@@ -1239,9 +1401,52 @@ app.post('/api/monitors', (req, res) => {
   });
 });
 
-app.patch('/api/monitors/:monitorId', (req, res) => {
+app.patch('/api/monitors/:monitorId', (req, res, next) => {
   const store = loadStore();
-  return upsertWorkspaceEntity({ req, res, store, listName: 'monitors', entityId: req.params.monitorId, eventBase: 'monitor' });
+  return upsertWorkspaceEntity({ req, res, next, store, listName: 'monitors', entityId: req.params.monitorId, eventBase: 'monitor' });
+});
+
+app.delete('/api/monitors/:monitorId', (req, res, next) => {
+  const store = loadStore();
+  return deleteWorkspaceEntity({ req, res, next, store, listName: 'monitors', entityId: req.params.monitorId, eventBase: 'monitor' });
+});
+
+app.post('/api/monitors/:monitorId/run', (req, res, next) => {
+  try {
+    const store = loadStore();
+    const monitor = store.monitors.find((m) => m.id === req.params.monitorId);
+    if (!monitor) throw new ApiError(404, 'Monitor not found', 'ERR_NOT_FOUND', { id: req.params.monitorId });
+
+    const workspace = requireWorkspace(store, monitor.workspaceId);
+    ensureEntityAccess(req, workspace, 'editor');
+
+    const responseTime = Math.round(200 + Math.random() * 1300);
+    const succeeded = Math.random() > 0.2;
+    const timestamp = new Date().toISOString();
+
+    monitor.totalRuns = (monitor.totalRuns || 0) + 1;
+    monitor.failedRuns = succeeded ? monitor.failedRuns || 0 : (monitor.failedRuns || 0) + 1;
+    monitor.status = succeeded ? 'passing' : 'failing';
+    monitor.lastRun = timestamp;
+    if (!succeeded) {
+      monitor.lastFailure = timestamp;
+    }
+
+    const runEntry = { timestamp, status: succeeded ? 'pass' : 'fail', responseTime };
+    monitor.recentRuns = [runEntry, ...(monitor.recentRuns || [])].slice(0, 40);
+    const totalResponse = monitor.recentRuns.reduce((sum, run) => sum + (run.responseTime || 0), 0);
+    monitor.avgResponseTime = monitor.recentRuns.length ? Math.round(totalResponse / monitor.recentRuns.length) : responseTime;
+    const passedCount = monitor.totalRuns - (monitor.failedRuns || 0);
+    monitor.uptime = monitor.totalRuns ? Math.round((passedCount / monitor.totalRuns) * 100) : 100;
+
+    bumpEntity(monitor);
+    saveStore(store);
+    auditEvent(req, 'monitor.ran', workspace.id, 'monitor', monitor.id, runEntry);
+    publishEvent('monitor.updated', { workspaceId: workspace.id, entity: monitor });
+    res.json({ run: runEntry, monitor });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.post('/api/runtime/execute', async (req, res) => {
@@ -1319,6 +1524,56 @@ app.post('/api/runtime/run-collection', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Collection run failed', message: error.message });
+  }
+});
+
+app.post('/api/runtime/execute-flow', async (req, res, next) => {
+  const store = loadStore();
+  try {
+    const workspaceId = req.body.workspaceId;
+    const flowId = req.body.flowId;
+    const flow = store.flows.find((f) => f.id === flowId && f.workspaceId === workspaceId);
+    if (!flow) throw new ApiError(404, 'Flow not found', 'ERR_NOT_FOUND', { id: flowId });
+
+    // Dummy DAG runner logic taking actual nodes into consideration
+    const nodes = flow.nodes || [];
+    const results = {};
+    let passed = true;
+
+    for (const node of nodes) {
+      if (node.type === 'delay') {
+        const timeout = Math.min(node.durationMs || 1000, 3000);
+        await new Promise((r) => setTimeout(r, timeout));
+        results[node.id] = { status: 'success', time: timeout };
+      } else if (node.type === 'request' && node.requestId) {
+        const collectionReqId = node.requestId;
+        // In a real DAG, we'd lookup request from store.collections instead.
+        // For now, simulate real runtime hook mapping
+        await new Promise((r) => setTimeout(r, 200)); 
+        results[node.id] = { status: 'success', responseCode: 200 };
+      } else if (node.type === 'condition') {
+        results[node.id] = { status: 'success', evaluated: true };
+      } else {
+        results[node.id] = { status: 'success' };
+      }
+    }
+
+    flow.totalRuns = (flow.totalRuns || 0) + 1;
+    flow.lastRun = new Date().toISOString();
+    saveStore(store);
+
+    auditEvent(req, 'runtime.flow.executed', workspaceId, 'flow', flow.id, { totalNodes: nodes.length });
+    publishEvent('runtime.flow.executed', { workspaceId, flowId: flow.id });
+
+    res.json({
+      ok: true,
+      flowId,
+      results,
+      passed,
+      time: new Date().toISOString()
+    });
+  } catch (error) {
+    next(error);
   }
 });
 
@@ -1482,6 +1737,20 @@ app.delete('/api/history', (req, res) => {
     res.json({ ok: true });
 });
 
+app.patch('/api/settings/:scope', (req, res) => {
+  const store = loadStore();
+  const { scope } = req.params;
+  
+  if (scope !== 'workspace' && scope !== 'user') {
+    return res.status(400).json({ error: 'Invalid settings scope' });
+  }
+  
+  store.settings[scope] = { ...store.settings[scope], ...req.body };
+  saveStore(store);
+  publishEvent('settings.updated', { scope, settings: store.settings[scope] });
+  res.json({ ok: true, settings: store.settings[scope] });
+});
+
 app.post('/proxy', async (req, res) => {
   const { url, method = 'GET', headers = {}, body } = req.body;
   if (!url) {
@@ -1535,6 +1804,15 @@ app.all(/^\/mock\/([^/]+)\/(.*)$/, (req, res) => {
   }
 
   res.status(Number(route.statusCode || 200)).json(route.responseBody || { ok: true });
+});
+
+app.use((err, req, res, next) => {
+  console.error('[API Error]', err.message);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal Server Error',
+    code: err.code || 'ERR_INTERNAL',
+    details: err.details || {},
+  });
 });
 
 initializePersistence()

@@ -1,43 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import axios from 'axios'
+import { supabase } from '../lib/supabaseClient'
 
 const AppContext = createContext(null)
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3001'
-
-function parseJwtPayload(token) {
-  try {
-    const parts = token.split('.')
-    if (parts.length < 2) return null
-    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
-    return JSON.parse(atob(padded))
-  } catch {
-    return null
-  }
-}
-
-function getSupabaseAccessToken() {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-  const ref = supabaseUrl.replace(/^https?:\/\//, '').split('.')[0]
-  const keys = [
-    ref ? `sb-${ref}-auth-token` : '',
-    'supabase.auth.token',
-  ].filter(Boolean)
-
-  for (const key of keys) {
-    const raw = localStorage.getItem(key)
-    if (!raw) continue
-    try {
-      const parsed = JSON.parse(raw)
-      if (parsed?.access_token) return parsed.access_token
-    } catch {
-      // ignore invalid token cache shape
-    }
-  }
-
-  return ''
-}
 
 const blankRow = (prefix) => ({
   id: `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -97,8 +64,12 @@ function flattenRequests(items = [], acc = []) {
 }
 
 export function AppProvider({ children }) {
-  const [supabaseAccessToken, setSupabaseAccessToken] = useState(() => getSupabaseAccessToken())
-  const supabaseUser = useMemo(() => parseJwtPayload(supabaseAccessToken), [supabaseAccessToken])
+  const [session, setSession] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [authError, setAuthError] = useState('')
+
+  const supabaseUser = session?.user || null
+  const supabaseAccessToken = session?.access_token || ''
 
   const api = useMemo(() => {
     const instance = axios.create({ baseURL: API_BASE })
@@ -107,13 +78,11 @@ export function AppProvider({ children }) {
       if (supabaseAccessToken) {
         nextConfig.headers.Authorization = `Bearer ${supabaseAccessToken}`
       }
-      if (supabaseUser?.sub) {
-        nextConfig.headers['x-user-id'] = supabaseUser.sub
+      if (supabaseUser?.id) {
+        nextConfig.headers['x-user-id'] = supabaseUser.id
       }
       if (supabaseUser?.email) {
         nextConfig.headers['x-user-email'] = supabaseUser.email
-      }
-      if (supabaseUser?.email) {
         const fallbackName = supabaseUser.user_metadata?.name || supabaseUser.email.split('@')[0]
         nextConfig.headers['x-user-name'] = fallbackName
       }
@@ -131,6 +100,7 @@ export function AppProvider({ children }) {
   const [activeTabId, setActiveTabId] = useState('tab-init-1')
   const [sidePanel, setSidePanel] = useState('collections')
   const [history, setHistory] = useState([])
+  const [settings, setSettings] = useState({ workspace: {}, user: {} })
   const [consoleLogs, setConsoleLogs] = useState([])
   const [showConsole, setShowConsole] = useState(false)
   const [activePage, setActivePage] = useState('builder')
@@ -142,6 +112,57 @@ export function AppProvider({ children }) {
   const [apis, setApis] = useState([])
 
   const tabCounter = useRef(2)
+
+  const clearWorkspaceState = useCallback(() => {
+    setWorkspaces([])
+    setActiveWorkspaceId('')
+    setCollections([])
+    setEnvironments([])
+    setActiveEnvId('')
+    setTabs([newTab({ id: 'tab-init-1' })])
+    setActiveTabId('tab-init-1')
+    setSidePanel('collections')
+    setHistory([])
+    setConsoleLogs([])
+    setShowConsole(false)
+    setActivePage('builder')
+    setModals({ team: false, environment: false, workspace: false, newCollection: false, import: false, runner: false })
+    setMockServers([])
+    setMonitors([])
+    setFlows([])
+    setApis([])
+    tabCounter.current = 2
+  }, [])
+
+  const signInWithPassword = useCallback(async ({ email, password }) => {
+    setAuthError('')
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+    setSession(data.session || null)
+    return data
+  }, [])
+
+  const signUpWithPassword = useCallback(async ({ name, email, password }) => {
+    setAuthError('')
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: name ? { name } : undefined,
+      },
+    })
+    if (error) throw error
+    return data
+  }, [])
+
+  const signOut = useCallback(async () => {
+    const { error } = await supabase.auth.signOut()
+    if (error) throw error
+    clearWorkspaceState()
+    setSession(null)
+  }, [clearWorkspaceState])
+
+  const clearAuthError = useCallback(() => setAuthError(''), [])
 
   const activeWorkspace = useMemo(() => workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0] || null, [workspaces, activeWorkspaceId])
   const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId) || tabs[0] || null, [tabs, activeTabId])
@@ -164,15 +185,46 @@ export function AppProvider({ children }) {
     setMockServers(data.mockServers || [])
     setMonitors(data.monitors || [])
     setHistory(data.history || [])
+    setSettings(data.settings || { workspace: {}, user: {} })
 
     const preferredEnv = (data.environments || []).find(e => e.isGlobal)?.id || data.environments?.[0]?.id || ''
     setActiveEnvId(preferredEnv)
   }, [api])
 
   useEffect(() => {
-    const refreshAuthToken = () => setSupabaseAccessToken(getSupabaseAccessToken())
-    window.addEventListener('storage', refreshAuthToken)
-    const tokenInterval = window.setInterval(refreshAuthToken, 5000)
+    let mounted = true
+
+    supabase.auth.getSession()
+      .then(({ data, error }) => {
+        if (!mounted) return
+        if (error) {
+          setAuthError(error.message)
+        }
+        setSession(data?.session || null)
+      })
+      .catch((error) => {
+        if (!mounted) return
+        setAuthError(error.message || 'Unable to load authentication session')
+      })
+      .finally(() => {
+        if (!mounted) return
+        setAuthLoading(false)
+      })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!mounted) return
+      setSession(nextSession || null)
+      setAuthError('')
+    })
+
+    return () => {
+      mounted = false
+      listener.subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!supabaseAccessToken) return
 
     api.get(`/api/bootstrap`)
       .then(({ data }) => {
@@ -187,19 +239,12 @@ export function AppProvider({ children }) {
         setMockServers(data.mockServers || [])
         setMonitors(data.monitors || [])
         setHistory(data.history || [])
-
-        const preferredEnv = (data.environments || []).find(e => e.isGlobal)?.id || data.environments?.[0]?.id || ''
-        setActiveEnvId(preferredEnv)
+          setSettings(data.settings || { workspace: {}, user: {} })
       })
       .catch((error) => {
         appendConsole({ type: 'error', message: `Failed to load workspace: ${error.message}` })
       })
-
-    return () => {
-      window.removeEventListener('storage', refreshAuthToken)
-      window.clearInterval(tokenInterval)
-    }
-  }, [appendConsole, api])
+  }, [appendConsole, api, supabaseAccessToken])
 
   useEffect(() => {
     if (!activeWorkspaceId) return undefined
@@ -362,6 +407,103 @@ export function AppProvider({ children }) {
     return saved
   }, [activeWorkspaceId, persistCollection])
 
+  const saveRequest = useCallback(async (tab, options = {}) => {
+    if (!tab || !activeWorkspaceId) return null
+
+    const requestPayload = normalizeRequest({
+      ...tab,
+      id: tab.requestId || undefined,
+      headers: tab.headers,
+      params: tab.params,
+      body: tab.body,
+      auth: tab.auth,
+    })
+
+    const persistCollectionDraft = async (collectionDraft) => {
+      const { data } = await api.patch(`/api/collections/${collectionDraft.id}`, {
+        name: collectionDraft.name,
+        description: collectionDraft.description,
+        expanded: collectionDraft.expanded,
+        items: collectionDraft.items,
+        version: collectionDraft.version,
+      })
+      setCollections(prev => prev.map(c => (c.id === data.id ? data : c)))
+      return data
+    }
+
+    const replaceRequest = (items = []) => {
+      let touched = false
+      const updatedItems = items.map((item) => {
+        if (item.id === requestPayload.id) {
+          touched = true
+          return requestPayload
+        }
+        if (item.type === 'folder' && Array.isArray(item.items)) {
+          const nested = replaceRequest(item.items)
+          if (nested.touched) {
+            touched = true
+            return { ...item, items: nested.items }
+          }
+        }
+        return item
+      })
+      return { items: updatedItems, touched }
+    }
+
+    let updatedCollection = null
+    let updatedItems = null
+    for (const collection of collections) {
+      const result = replaceRequest(collection.items || [])
+      if (result.touched) {
+        updatedCollection = collection
+        updatedItems = result.items
+        break
+      }
+    }
+
+    if (updatedCollection) {
+      const draft = { ...updatedCollection, items: updatedItems }
+      try {
+        const saved = await persistCollectionDraft(draft)
+        setTabs(prev => prev.map(t => (
+          t.id === tab.id
+            ? { ...t, dirty: false, requestId: requestPayload.id, collectionId: updatedCollection.id }
+            : t
+        )))
+        appendConsole({ type: 'log', message: `Saved ${requestPayload.name} to ${updatedCollection.name}` })
+        return saved
+      } catch (error) {
+        appendConsole({ type: 'error', message: `Failed to save request: ${error.message}` })
+        await hydrateWorkspace(activeWorkspaceId)
+      }
+      return null
+    }
+
+    let destination = collections.find(c => c.id === (options.collectionId || tab.collectionId))
+    if (!destination) {
+      destination = collections.find(c => c.workspaceId === activeWorkspaceId)
+    }
+    if (!destination) {
+      destination = await addCollection('Saved Requests')
+    }
+
+    const draft = { ...destination, items: [...(destination.items || []), requestPayload] }
+    try {
+      const savedCollection = await persistCollectionDraft(draft)
+      setTabs(prev => prev.map(t => (
+        t.id === tab.id
+          ? { ...t, dirty: false, requestId: requestPayload.id, collectionId: savedCollection.id }
+          : t
+      )))
+      appendConsole({ type: 'log', message: `Created ${requestPayload.name} in ${savedCollection.name}` })
+      return savedCollection
+    } catch (error) {
+      appendConsole({ type: 'error', message: `Failed to create request: ${error.message}` })
+      await hydrateWorkspace(activeWorkspaceId)
+      return null
+    }
+  }, [activeWorkspaceId, addCollection, api, appendConsole, collections, hydrateWorkspace])
+
   const toggleCollectionExpand = useCallback(async (colId) => {
     const current = collections.find(c => c.id === colId)
     if (!current) return
@@ -410,15 +552,15 @@ export function AppProvider({ children }) {
     setActiveEnvId(data.id)
   }, [api, activeWorkspaceId])
 
-  const addWorkspace = useCallback(async (name, type) => {
-    const { data } = await api.post(`/api/workspaces`, { name, type })
+  const addWorkspace = useCallback(async (name, type, description = '') => {
+    const { data } = await api.post(`/api/workspaces`, { name, type, description })
     setWorkspaces(prev => [...prev, data])
     setActiveWorkspaceId(data.id)
     await hydrateWorkspace(data.id)
   }, [api, hydrateWorkspace])
 
-  const inviteMember = useCallback(async (wsId, email) => {
-    const { data } = await api.post(`/api/workspaces/${wsId}/members`, { email, role: 'viewer' })
+  const inviteMember = useCallback(async (wsId, email, role = 'viewer') => {
+    const { data } = await api.post(`/api/workspaces/${wsId}/members`, { email, role })
     setWorkspaces(prev => prev.map(ws => (ws.id === wsId ? { ...ws, members: [...ws.members, data] } : ws)))
   }, [api])
 
@@ -438,11 +580,41 @@ export function AppProvider({ children }) {
     })))
   }, [api])
 
+  const updateWorkspaceMeta = useCallback(async (workspaceId, updates = {}) => {
+    const { data } = await api.patch(`/api/workspaces/${workspaceId}`, updates)
+    setWorkspaces(prev => prev.map(ws => (ws.id === workspaceId ? data : ws)))
+    return data
+  }, [api])
+
+  const deleteWorkspace = useCallback(async (workspaceId) => {
+    await api.delete(`/api/workspaces/${workspaceId}`)
+    const remaining = workspaces.filter(ws => ws.id !== workspaceId)
+    setWorkspaces(remaining)
+
+    if (workspaceId !== activeWorkspaceId) return
+
+    const nextWorkspace = remaining[0]?.id || ''
+    if (nextWorkspace) {
+      setActiveWorkspaceId(nextWorkspace)
+      await hydrateWorkspace(nextWorkspace)
+    } else {
+      clearWorkspaceState()
+    }
+  }, [api, activeWorkspaceId, clearWorkspaceState, hydrateWorkspace, workspaces])
+
   const clearHistory = useCallback(async () => {
     if (!activeWorkspaceId) return
     await api.delete(`/api/history`, { params: { workspaceId: activeWorkspaceId } })
     setHistory([])
   }, [api, activeWorkspaceId])
+
+  const updateSettings = useCallback(async (scope, updates) => {
+    await api.patch(`/api/settings/${scope}`, updates)
+    setSettings(prev => ({
+      ...prev,
+      [scope]: { ...prev[scope], ...updates }
+    }))
+  }, [api])
 
   const runCollection = useCallback(async ({ collectionId, iterations, delayMs, environmentId }) => {
     const { data } = await api.post(`/api/runtime/run-collection`, {
@@ -471,6 +643,20 @@ export function AppProvider({ children }) {
     return data
   }, [api, activeWorkspaceId])
 
+  const updateFlow = useCallback(async (flowId, payload = {}) => {
+    const current = flows.find(f => f.id === flowId)
+    if (!current) return null
+    const { data } = await api.patch(`/api/flows/${flowId}`, { ...payload, version: current.version })
+    setFlows(prev => prev.map(f => (f.id === flowId ? data : f)))
+    return data
+  }, [api, flows])
+
+  const runFlow = useCallback(async (flowId) => {
+    if (!activeWorkspaceId) throw new Error('Select a workspace before running flows')
+    const { data } = await api.post(`/api/runtime/execute-flow`, { workspaceId: activeWorkspaceId, flowId })
+    return data
+  }, [api, activeWorkspaceId])
+
   const createMockServer = useCallback(async (payload = {}) => {
     if (!activeWorkspaceId) return null
     const { data } = await api.post(`/api/mock-servers`, { workspaceId: activeWorkspaceId, ...payload })
@@ -478,12 +664,29 @@ export function AppProvider({ children }) {
     return data
   }, [api, activeWorkspaceId])
 
+  const updateMockServer = useCallback(async (mockId, payload) => {
+    const { data } = await api.patch(`/api/mock-servers/${mockId}`, payload)
+    setMockServers(prev => prev.map(m => m.id === mockId ? data : m))
+    return data
+  }, [api])
+
+  const deleteMockServer = useCallback(async (mockId) => {
+    await api.delete(`/api/mock-servers/${mockId}`)
+    setMockServers(prev => prev.filter(m => m.id !== mockId))
+  }, [api])
+
   const createMonitor = useCallback(async (payload = {}) => {
     if (!activeWorkspaceId) return null
     const { data } = await api.post(`/api/monitors`, { workspaceId: activeWorkspaceId, ...payload })
     setMonitors(prev => [...prev, data])
     return data
   }, [api, activeWorkspaceId])
+
+  const runMonitor = useCallback(async (monitorId) => {
+    const { data } = await api.post(`/api/monitors/${monitorId}/run`)
+    setMonitors(prev => prev.map(m => (m.id === monitorId ? data.monitor : m)))
+    return data
+  }, [api])
 
   const importCollection = useCallback(async ({ name, items }) => {
     const collection = {
@@ -504,56 +707,82 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider
       value={{
-        workspaces,
-        activeWorkspace,
-        activeWorkspaceId,
-        setActiveWorkspaceId: async (id) => { setActiveWorkspaceId(id); await hydrateWorkspace(id) },
-        collections,
-        activeEnv,
-        activeEnvId,
-        setActiveEnvId,
-        environments,
-        tabs,
-        activeTab,
-        activeTabId,
-        setActiveTabId,
-        sidePanel,
-        setSidePanel,
-        history,
-        consoleLogs,
-        setConsoleLogs,
-        showConsole,
-        setShowConsole,
-        activePage,
-        setActivePage,
-        mockServers,
-        monitors,
-        flows,
-        apis,
-        modals,
-        openModal,
-        closeModal,
-        addTab,
-        closeTab,
-        updateTab,
-        openRequest,
-        sendRequest,
-        resolveEnvVars,
-        toggleCollectionExpand,
-        toggleFolderExpand,
-        addCollection,
-        updateEnvironment,
-        addEnvironment,
-        addWorkspace,
-        inviteMember,
-        updateMemberRole,
-        removeMember,
+          session,
+          supabaseUser,
+          supabaseAccessToken,
+          authLoading,
+          authError,
+          clearAuthError,
+          signInWithPassword,
+          signUpWithPassword,
+          signOut,
+          workspaces,
+          activeWorkspace,
+          activeWorkspaceId,
+          setActiveWorkspaceId: async (id) => {
+            if (!id) {
+              clearWorkspaceState()
+              return
+            }
+            setActiveWorkspaceId(id)
+            await hydrateWorkspace(id)
+          },
+          collections,
+          activeEnv,
+          activeEnvId,
+          setActiveEnvId,
+          environments,
+          tabs,
+          activeTab,
+          activeTabId,
+          setActiveTabId,
+          sidePanel,
+          setSidePanel,
+          history,
+          consoleLogs,
+          setConsoleLogs,
+          showConsole,
+          setShowConsole,
+          activePage,
+          setActivePage,
+          settings,
+          updateSettings,
+          mockServers,
+          monitors,
+          flows,
+          apis,
+          modals,
+          openModal,
+          closeModal,
+          addTab,
+          closeTab,
+          updateTab,
+          saveRequest,
+          openRequest,
+          sendRequest,
+          resolveEnvVars,
+          toggleCollectionExpand,
+          toggleFolderExpand,
+          addCollection,
+          updateEnvironment,
+          addEnvironment,
+          addWorkspace,
+          inviteMember,
+          updateMemberRole,
+          removeMember,
+          updateWorkspaceMeta,
+          deleteWorkspace,
           clearHistory,
           runCollection,
           createApi,
           createFlow,
+          updateFlow,
+          runFlow,
           createMockServer,
+          updateMockServer,
+          deleteMockServer,
           createMonitor,
+          runMonitor,
           importCollection,
           flattenRequests,
         }}

@@ -87,8 +87,19 @@ function MonitorCard({ monitor, onClick }) {
   )
 }
 
-function MonitorDetail({ monitor, onClose }) {
+function MonitorDetail({ monitor, onClose, onRun }) {
   const isPassing = monitor.status === 'passing'
+  const [running, setRunning] = useState(false)
+
+  const handleRun = async () => {
+    if (!onRun) return
+    setRunning(true)
+    try {
+      await onRun(monitor)
+    } finally {
+      setRunning(false)
+    }
+  }
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin">
@@ -115,8 +126,12 @@ function MonitorDetail({ monitor, onClose }) {
             <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#CCCCCC] border border-[#3D3D3D] hover:border-[#5A5A5A] rounded-lg transition-colors">
               <Bell size={12} /> Alerts
             </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors">
-              <Play size={12} /> Run Now
+            <button
+              onClick={handleRun}
+              disabled={running}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors disabled:opacity-50"
+            >
+              {running ? <><Play size={12} className="animate-pulse" /> Running...</> : <><Play size={12} /> Run Now</>}
             </button>
           </div>
         </div>
@@ -192,7 +207,7 @@ function MonitorDetail({ monitor, onClose }) {
 }
 
 export default function MonitorsPage() {
-  const { monitors, activeWorkspaceId, createMonitor } = useApp()
+  const { monitors, activeWorkspaceId, createMonitor, runMonitor } = useApp()
   const [selectedMonitor, setSelectedMonitor] = useState(null)
 
   const handleCreateMonitor = async () => {
@@ -214,8 +229,21 @@ export default function MonitorsPage() {
 
   const wsMonitors = monitors.filter(m => m.workspaceId === activeWorkspaceId)
 
+  const handleRunNow = async (monitor) => {
+    const result = await runMonitor(monitor.id)
+    if (result?.monitor) {
+      setSelectedMonitor(result.monitor)
+    }
+  }
+
   if (selectedMonitor) {
-    return <MonitorDetail monitor={selectedMonitor} onClose={() => setSelectedMonitor(null)} />
+    return (
+      <MonitorDetail
+        monitor={selectedMonitor}
+        onClose={() => setSelectedMonitor(null)}
+        onRun={handleRunNow}
+      />
+    )
   }
 
   const passing = wsMonitors.filter(m => m.status === 'passing').length

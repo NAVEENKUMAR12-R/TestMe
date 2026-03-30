@@ -94,11 +94,95 @@ function MockCard({ server, onClick }) {
 }
 
 function MockDetail({ server, onClose }) {
+  const { updateMockServer, deleteMockServer } = useApp()
+  const [editingRoute, setEditingRoute] = useState(null)
+
+  const handleAddRoute = () => {
+    setEditingRoute({
+      method: 'GET',
+      path: '/new-route',
+      statusCode: 200,
+      responseTime: 50,
+      responseBody: { message: "Success" }
+    })
+  }
+
+  const handleSaveRoute = async () => {
+    if (!editingRoute) return;
+    
+    let updatedRoutes = [...(server.routes || [])]
+    if (editingRoute._originalIndex !== undefined) {
+      updatedRoutes[editingRoute._originalIndex] = editingRoute;
+      delete editingRoute._originalIndex;
+    } else {
+      updatedRoutes.push(editingRoute)
+    }
+
+    await updateMockServer(server.id, { ...server, routes: updatedRoutes })
+    server.routes = updatedRoutes; // local optimistic update
+    setEditingRoute(null)
+  }
+
+  const handleDeleteRoute = async (index) => {
+    const updatedRoutes = server.routes.filter((_, i) => i !== index)
+    await updateMockServer(server.id, { ...server, routes: updatedRoutes })
+    server.routes = updatedRoutes; // local optimistic update
+  }
+
+  const handleDeleteMockServer = async () => {
+    await deleteMockServer(server.id)
+    onClose()
+  }
+
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-thin">
+    <div className="flex-1 overflow-y-auto scrollbar-thin relative text-white">
+      {editingRoute && (
+         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-10 flex items-center justify-center">
+            <div className="bg-[#252525] border border-[#3D3D3D] rounded-xl p-6 w-96">
+               <h3 className="text-lg font-bold mb-4">{editingRoute._originalIndex !== undefined ? 'Edit' : 'Add'} Route</h3>
+               <div className="space-y-4">
+                  <div>
+                    <label className="text-xs text-[#8D8D8D] mb-1 block">Method</label>
+                    <select 
+                      className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded px-3 py-2 text-sm"
+                      value={editingRoute.method} onChange={(e) => setEditingRoute({...editingRoute, method: e.target.value})}>
+                      {['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-[#8D8D8D] mb-1 block">Path (e.g., /api/users)</label>
+                    <input type="text" className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded px-3 py-2 text-sm" 
+                           value={editingRoute.path} onChange={(e) => setEditingRoute({...editingRoute, path: e.target.value})} />
+                  </div>
+                   <div>
+                    <label className="text-xs text-[#8D8D8D] mb-1 block">Status Code</label>
+                    <input type="number" className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded px-3 py-2 text-sm" 
+                           value={editingRoute.statusCode} onChange={(e) => setEditingRoute({...editingRoute, statusCode: Number(e.target.value)})} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-[#8D8D8D] mb-1 block">Response Body (JSON)</label>
+                    <textarea className="w-full h-32 bg-[#1C1C1C] border border-[#3D3D3D] rounded px-3 py-2 text-sm font-mono" 
+                           value={typeof editingRoute.responseBody === 'string' ? editingRoute.responseBody : JSON.stringify(editingRoute.responseBody, null, 2)} 
+                           onChange={(e) => {
+                             try {
+                                setEditingRoute({...editingRoute, responseBody: JSON.parse(e.target.value)})
+                             } catch {
+                                setEditingRoute({...editingRoute, responseBody: e.target.value})
+                             }
+                           }} />
+                  </div>
+               </div>
+               <div className="flex gap-2 mt-6 justify-end">
+                   <button onClick={() => setEditingRoute(null)} className="px-4 py-2 text-sm text-[#CCCCCC] bg-[#3D3D3D] rounded hover:bg-[#5A5A5A]">Cancel</button>
+                   <button onClick={handleSaveRoute} className="px-4 py-2 text-sm text-white bg-[#FF6C37] rounded hover:bg-[#e05a2a]">Save Route</button>
+               </div>
+            </div>
+         </div>
+      )}
+
       <div className="p-8">
         <button onClick={onClose} className="text-[#8D8D8D] hover:text-[#CCCCCC] text-xs mb-6 transition-colors">← Back to Mock Servers</button>
-
+        
         <div className="flex items-start justify-between mb-8">
           <div className="flex items-start gap-4">
             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${server.status === 'active' ? 'bg-[#6C63FF]/20' : 'bg-[#3D3D3D]'}`}>
@@ -124,6 +208,9 @@ function MockDetail({ server, onClose }) {
             </button>
             <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors">
               <Zap size={12} /> Test All Routes
+            </button>
+            <button onClick={handleDeleteMockServer} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#F93E3E] hover:bg-red-600 rounded-lg transition-colors">
+              <Trash2 size={12} /> Delete Server
             </button>
           </div>
         </div>
@@ -181,13 +268,13 @@ function MockDetail({ server, onClose }) {
                   <span className="text-xs text-[#FCA130]">{route.responseTime}ms</span>
                 </div>
                 <div className="px-4 py-3 flex gap-2">
-                  <button className="text-[#5A5A5A] hover:text-[#CCCCCC] transition-colors"><Edit2 size={12} /></button>
-                  <button className="text-[#5A5A5A] hover:text-[#F93E3E] transition-colors"><Trash2 size={12} /></button>
+                  <button onClick={() => setEditingRoute({ ...route, _originalIndex: i })} className="text-[#5A5A5A] hover:text-[#CCCCCC] transition-colors"><Edit2 size={12} /></button>
+                  <button onClick={() => handleDeleteRoute(i)} className="text-[#5A5A5A] hover:text-[#F93E3E] transition-colors"><Trash2 size={12} /></button>
                 </div>
               </div>
             ))}
             <div className="border-t border-[#3D3D3D] px-4 py-2.5">
-              <button className="flex items-center gap-2 text-xs text-[#5A5A5A] hover:text-[#CCCCCC] transition-colors">
+              <button onClick={handleAddRoute} className="flex items-center gap-2 text-xs text-[#5A5A5A] hover:text-[#CCCCCC] transition-colors">
                 <Plus size={12} /> Add Route
               </button>
             </div>

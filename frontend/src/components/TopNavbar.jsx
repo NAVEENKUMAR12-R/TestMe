@@ -10,14 +10,18 @@ export default function TopNavbar() {
   const {
     workspaces, activeWorkspace, activeWorkspaceId, setActiveWorkspaceId,
     openModal, activePage, setActivePage, addTab,
+    supabaseUser, signOut,
   } = useApp()
 
   const [wsDropdown, setWsDropdown] = useState(false)
   const [newDropdown, setNewDropdown] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchText, setSearchText] = useState('')
+  const [accountDropdown, setAccountDropdown] = useState(false)
 
   const workspaceMembers = activeWorkspace?.members ?? []
+  const displayName = supabaseUser?.user_metadata?.name || supabaseUser?.email?.split('@')[0] || 'You'
+  const userInitial = displayName.slice(0, 1).toUpperCase()
 
   const handleSwitchWorkspace = (wsId) => {
     setActiveWorkspaceId(wsId)
@@ -242,16 +246,50 @@ export default function TopNavbar() {
           </div>
 
 
-        {/* User avatar */}
-        <div
-          onClick={() => setActivePage('settings')}
-          className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ml-1 cursor-pointer border-2"
-          style={{ backgroundColor: '#FF6C37', borderColor: '#FF6C37', color: 'white' }}
-          title="You"
-        >
-          Y
+          <div className="relative">
+            <button
+              onClick={() => setAccountDropdown((prev) => !prev)}
+              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ml-1 cursor-pointer border-2"
+              style={{ backgroundColor: '#FF6C37', borderColor: '#FF6C37', color: 'white' }}
+              title={displayName}
+            >
+              {userInitial}
+            </button>
+
+            {accountDropdown && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setAccountDropdown(false)} />
+                <div className="absolute top-full right-0 mt-1 w-56 bg-[#252525] border border-[#3D3D3D] rounded-lg shadow-xl z-50 overflow-hidden py-1">
+                  <div className="px-3 py-2 border-b border-[#3D3D3D]">
+                    <p className="text-xs text-[#CCCCCC] truncate">{displayName}</p>
+                    <p className="text-[11px] text-[#8D8D8D] truncate">{supabaseUser?.email || 'Signed in'}</p>
+                  </div>
+                  <button
+                    onClick={() => { setActivePage('settings'); setAccountDropdown(false) }}
+                    className="w-full text-left px-3 py-2 text-xs text-[#CCCCCC] hover:bg-[#2D2D2D]"
+                  >
+                    Account settings
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setAccountDropdown(false)
+                      try {
+                        await signOut()
+                      } catch (error) {
+                        // eslint-disable-next-line no-console
+                        console.error('Sign out failed', error)
+                      }
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-[#FF9C9C] hover:bg-[#2D2D2D]"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
-  )
-}
+      </header>
+    )
+  }
+

@@ -1,4 +1,4 @@
-import { createElement, useState } from 'react'
+import { createElement, useState, useEffect } from 'react'
 import { useApp } from '../../context/AppContext'
 import {
   Settings, User, Bell, Shield, Palette,
@@ -16,6 +16,31 @@ const SECTION_ICONS = {
   Privacy:       Shield,
   Data:          Download,
 }
+
+const WORKSPACE_SETTING_KEYS = new Set([
+  'defaultMethod',
+  'timeout',
+  'maxRedirects',
+  'followRedirects',
+  'sslVerification',
+  'sendCookies',
+  'encodingUrl',
+  'trimWhitespace',
+  'notifyOnSuccess',
+  'notifyOnError',
+  'notifyOnMonitorAlert',
+  'telemetry',
+  'crashReports',
+])
+
+const USER_SETTING_KEYS = new Set([
+  'theme',
+  'fontSize',
+  'fontFamily',
+  'compactMode',
+  'showLineNumbers',
+  'wordWrap',
+])
 
 function Toggle({ value, onChange }) {
   return (
@@ -56,12 +81,20 @@ const SHORTCUTS = [
 ]
 
 export default function SettingsPage() {
-  const { activeWorkspace } = useApp()
+  const {
+    activeWorkspace,
+    settings: contextSettings = { workspace: {}, user: {} },
+    updateSettings,
+    collections = [],
+    environments = [],
+    clearHistory,
+    openModal,
+  } = useApp()
   const [activeSection, setActiveSection] = useState('General')
   const [saved, setSaved] = useState(false)
 
   // Settings state
-  const [settings, setSettings] = useState({
+  const [localSettings, setLocalSettings] = useState({
     // General
     defaultMethod: 'GET',
     timeout: '30000',
@@ -87,14 +120,106 @@ export default function SettingsPage() {
     crashReports: true,
   })
 
-  const update = (key, val) => setSettings(prev => ({ ...prev, [key]: val }))
+  useEffect(() => {
+    if (contextSettings) {
+      setLocalSettings(prev => ({
+        ...prev,
+        ...contextSettings.workspace,
+        ...contextSettings.user
+      }))
+    }
+  }, [contextSettings])
 
-  const handleSave = () => {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  const update = (key, val) => setLocalSettings(prev => ({ ...prev, [key]: val }))
+
+  const handleSave = async () => {
+    try {
+      const workspacePayload = Object.fromEntries(
+        Object.entries(localSettings).filter(([key]) => WORKSPACE_SETTING_KEYS.has(key))
+      )
+      const userPayload = Object.fromEntries(
+        Object.entries(localSettings).filter(([key]) => USER_SETTING_KEYS.has(key))
+      )
+
+      const pending = []
+      if (Object.keys(workspacePayload).length) pending.push(updateSettings('workspace', workspacePayload))
+      if (Object.keys(userPayload).length) pending.push(updateSettings('user', userPayload))
+      await Promise.all(pending)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const downloadJson = (filename, payload) => {
+    const data = JSON.stringify(payload, null, 2)
+    const blob = new Blob([data], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const workspaceSlug = (activeWorkspace?.name || 'workspace').replace(/\s+/g, '-').toLowerCase()
+  const workspaceLabel = activeWorkspace?.name || 'Workspace'
+  const workspaceCollections = collections.filter(c => c.workspaceId === activeWorkspace?.id)
+  const workspaceEnvironments = environments.filter(e => e.workspaceId === activeWorkspace?.id)
+
+  const handleExportCollections = () => {
+    if (!workspaceCollections.length) return
+    downloadJson(`${workspaceSlug}-collections.json`, workspaceCollections)
+  }
+
+  const handleExportEnvironments = () => {
+    if (!workspaceEnvironments.length) return
+    downloadJson(`${workspaceSlug}-environments.json`, workspaceEnvironments)
+  }
+
+  const handleImportCollections = () => openModal?.('import')
+  const handleClearHistory = async () => {
+    if (!clearHistory) return
+    await clearHistory()
   }
 
   const sections = ['General', 'Appearance', 'Shortcuts', 'Account', 'Notifications', 'Privacy', 'Data']
+
+  const dataActions = [
+    {
+      icon: Download,
+      label: 'Export Collections',
+      desc: 'Export as Postman-compatible JSON',
+      color: '#49CC90',
+      onClick: handleExportCollections,
+      disabled: workspaceCollections.length === 0,
+    },
+    {
+      icon: Upload,
+      label: 'Import Collections',
+      desc: 'Import from Postman, Insomnia, OpenAPI',
+      color: '#6C63FF',
+      onClick: handleImportCollections,
+    },
+    {
+      icon: Download,
+      label: 'Export Environments',
+      desc: 'Export environment variables',
+      color: '#FCA130',
+      onClick: handleExportEnvironments,
+      disabled: workspaceEnvironments.length === 0,
+    },
+    {
+      icon: Trash2,
+      label: 'Clear All History',
+      desc: 'Remove all request history',
+      color: '#F93E3E',
+      onClick: handleClearHistory,
+    },
+  ]
 
   return (
     <div className="flex-1 flex overflow-hidden bg-[#1C1C1C]">
@@ -102,7 +227,7 @@ export default function SettingsPage() {
       <div className="w-52 border-r border-[#2D2D2D] flex flex-col shrink-0 py-4">
         <div className="px-4 mb-4">
           <h1 className="text-sm font-semibold text-[#CCCCCC]">Settings</h1>
-          <p className="text-xs text-[#5A5A5A] mt-0.5">{activeWorkspace.name}</p>
+          <p className="text-xs text-[#5A5A5A] mt-0.5">{workspaceLabel}</p>
         </div>
         <nav className="flex flex-col gap-0.5 px-2">
           {sections.map(s => {
@@ -138,7 +263,7 @@ export default function SettingsPage() {
               <div className="bg-[#252525] rounded-xl border border-[#2D2D2D] px-4 mb-5">
                 <SettingRow label="Default HTTP Method" description="Method used when creating a new request">
                   <select
-                    value={settings.defaultMethod}
+                    value={localSettings.defaultMethod}
                     onChange={e => update('defaultMethod', e.target.value)}
                     className="h-8 px-3 bg-[#1C1C1C] border border-[#3D3D3D] rounded text-xs text-[#CCCCCC] outline-none"
                   >
@@ -150,7 +275,7 @@ export default function SettingsPage() {
                 <SettingRow label="Request Timeout (ms)" description="Maximum time in milliseconds to wait for a response">
                   <input
                     type="number"
-                    value={settings.timeout}
+                    value={localSettings.timeout}
                     onChange={e => update('timeout', e.target.value)}
                     className="w-24 h-8 px-3 bg-[#1C1C1C] border border-[#3D3D3D] rounded text-xs text-[#CCCCCC] outline-none"
                   />
@@ -158,7 +283,7 @@ export default function SettingsPage() {
                 <SettingRow label="Max Redirects" description="Maximum number of redirects to follow">
                   <input
                     type="number"
-                    value={settings.maxRedirects}
+                    value={localSettings.maxRedirects}
                     onChange={e => update('maxRedirects', e.target.value)}
                     min={0} max={20}
                     className="w-24 h-8 px-3 bg-[#1C1C1C] border border-[#3D3D3D] rounded text-xs text-[#CCCCCC] outline-none"
@@ -168,19 +293,19 @@ export default function SettingsPage() {
 
               <div className="bg-[#252525] rounded-xl border border-[#2D2D2D] px-4 mb-5">
                 <SettingRow label="Follow Redirects" description="Automatically follow HTTP redirects">
-                  <Toggle value={settings.followRedirects} onChange={v => update('followRedirects', v)} />
+                  <Toggle value={localSettings.followRedirects} onChange={v => update('followRedirects', v)} />
                 </SettingRow>
                 <SettingRow label="SSL Certificate Verification" description="Verify SSL certificates for HTTPS requests">
-                  <Toggle value={settings.sslVerification} onChange={v => update('sslVerification', v)} />
+                  <Toggle value={localSettings.sslVerification} onChange={v => update('sslVerification', v)} />
                 </SettingRow>
                 <SettingRow label="Send Cookies" description="Send cookies with each request">
-                  <Toggle value={settings.sendCookies} onChange={v => update('sendCookies', v)} />
+                  <Toggle value={localSettings.sendCookies} onChange={v => update('sendCookies', v)} />
                 </SettingRow>
                 <SettingRow label="URL Encoding" description="Automatically encode URL parameters">
-                  <Toggle value={settings.encodingUrl} onChange={v => update('encodingUrl', v)} />
+                  <Toggle value={localSettings.encodingUrl} onChange={v => update('encodingUrl', v)} />
                 </SettingRow>
                 <SettingRow label="Trim Whitespace" description="Trim whitespace from header and param values">
-                  <Toggle value={settings.trimWhitespace} onChange={v => update('trimWhitespace', v)} />
+                  <Toggle value={localSettings.trimWhitespace} onChange={v => update('trimWhitespace', v)} />
                 </SettingRow>
               </div>
             </div>
@@ -204,7 +329,7 @@ export default function SettingsPage() {
                         key={id}
                         onClick={() => update('theme', id)}
                         className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg border text-xs transition-colors ${
-                          settings.theme === id
+                          localSettings.theme === id
                             ? 'border-[#FF6C37] text-[#FF6C37] bg-[#FF6C37]/10'
                             : 'border-[#3D3D3D] text-[#8D8D8D] hover:border-[#5A5A5A]'
                         }`}
@@ -218,7 +343,7 @@ export default function SettingsPage() {
                 </SettingRow>
                 <SettingRow label="Font Size" description="Editor font size in pixels">
                   <select
-                    value={settings.fontSize}
+                    value={localSettings.fontSize}
                     onChange={e => update('fontSize', e.target.value)}
                     className="h-8 px-3 bg-[#1C1C1C] border border-[#3D3D3D] rounded text-xs text-[#CCCCCC] outline-none"
                   >
@@ -229,7 +354,7 @@ export default function SettingsPage() {
                 </SettingRow>
                 <SettingRow label="Font Family" description="Monospace font used in editors">
                   <select
-                    value={settings.fontFamily}
+                    value={localSettings.fontFamily}
                     onChange={e => update('fontFamily', e.target.value)}
                     className="h-8 px-3 bg-[#1C1C1C] border border-[#3D3D3D] rounded text-xs text-[#CCCCCC] outline-none"
                   >
@@ -242,13 +367,13 @@ export default function SettingsPage() {
 
               <div className="bg-[#252525] rounded-xl border border-[#2D2D2D] px-4 mb-5">
                 <SettingRow label="Compact Mode" description="Reduce spacing for a denser layout">
-                  <Toggle value={settings.compactMode} onChange={v => update('compactMode', v)} />
+                  <Toggle value={localSettings.compactMode} onChange={v => update('compactMode', v)} />
                 </SettingRow>
                 <SettingRow label="Show Line Numbers" description="Show line numbers in the response body editor">
-                  <Toggle value={settings.showLineNumbers} onChange={v => update('showLineNumbers', v)} />
+                  <Toggle value={localSettings.showLineNumbers} onChange={v => update('showLineNumbers', v)} />
                 </SettingRow>
                 <SettingRow label="Word Wrap" description="Wrap long lines in the response viewer">
-                  <Toggle value={settings.wordWrap} onChange={v => update('wordWrap', v)} />
+                  <Toggle value={localSettings.wordWrap} onChange={v => update('wordWrap', v)} />
                 </SettingRow>
               </div>
             </div>
@@ -334,13 +459,13 @@ export default function SettingsPage() {
 
               <div className="bg-[#252525] rounded-xl border border-[#2D2D2D] px-4 mb-5">
                 <SettingRow label="Notify on Success" description="Show notification when a request succeeds">
-                  <Toggle value={settings.notifyOnSuccess} onChange={v => update('notifyOnSuccess', v)} />
+                  <Toggle value={localSettings.notifyOnSuccess} onChange={v => update('notifyOnSuccess', v)} />
                 </SettingRow>
                 <SettingRow label="Notify on Error" description="Show notification when a request fails">
-                  <Toggle value={settings.notifyOnError} onChange={v => update('notifyOnError', v)} />
+                  <Toggle value={localSettings.notifyOnError} onChange={v => update('notifyOnError', v)} />
                 </SettingRow>
                 <SettingRow label="Monitor Alerts" description="Get notified when a monitor starts failing">
-                  <Toggle value={settings.notifyOnMonitorAlert} onChange={v => update('notifyOnMonitorAlert', v)} />
+                  <Toggle value={localSettings.notifyOnMonitorAlert} onChange={v => update('notifyOnMonitorAlert', v)} />
                 </SettingRow>
               </div>
             </div>
@@ -353,10 +478,10 @@ export default function SettingsPage() {
 
               <div className="bg-[#252525] rounded-xl border border-[#2D2D2D] px-4 mb-5">
                 <SettingRow label="Usage Telemetry" description="Send anonymous usage data to help improve PostFlow">
-                  <Toggle value={settings.telemetry} onChange={v => update('telemetry', v)} />
+                  <Toggle value={localSettings.telemetry} onChange={v => update('telemetry', v)} />
                 </SettingRow>
                 <SettingRow label="Crash Reports" description="Automatically send crash reports">
-                  <Toggle value={settings.crashReports} onChange={v => update('crashReports', v)} />
+                  <Toggle value={localSettings.crashReports} onChange={v => update('crashReports', v)} />
                 </SettingRow>
               </div>
             </div>
@@ -368,19 +493,16 @@ export default function SettingsPage() {
               <p className="text-xs text-[#5A5A5A] mb-6">Import and export your PostFlow data.</p>
 
               <div className="grid grid-cols-2 gap-3 mb-5">
-                {[
-                  { icon: Download, label: 'Export Collections', desc: 'Export as Postman-compatible JSON', color: '#49CC90' },
-                  { icon: Upload,   label: 'Import Collections', desc: 'Import from Postman, Insomnia, OpenAPI', color: '#6C63FF' },
-                  { icon: Download, label: 'Export Environments', desc: 'Export environment variables', color: '#FCA130' },
-                  { icon: Trash2,   label: 'Clear All History', desc: 'Remove all request history', color: '#F93E3E' },
-                ].map(({ icon: Icon, label, desc, color }) => (
+                {dataActions.map(({ icon: Icon, label, desc, color, onClick, disabled }) => (
                   <button
                     key={label}
-                    className="flex items-start gap-3 p-4 bg-[#252525] border border-[#2D2D2D] rounded-xl hover:border-[#3D3D3D] transition-colors text-left"
+                    onClick={onClick}
+                    disabled={disabled}
+                    className="flex items-start gap-3 p-4 bg-[#252525] border border-[#2D2D2D] rounded-xl hover:border-[#3D3D3D] transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: color + '20' }}>
-                        {createElement(Icon, { size: 15, style: { color } })}
-                      </div>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: color + '20' }}>
+                      {createElement(Icon, { size: 15, style: { color } })}
+                    </div>
 
                     <div>
                       <div className="text-xs font-medium text-[#CCCCCC]">{label}</div>

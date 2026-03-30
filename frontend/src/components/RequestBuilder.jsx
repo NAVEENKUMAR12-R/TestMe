@@ -227,7 +227,7 @@ function AuthPanel({ auth, onChange }) {
 const TABS = ['Params', 'Authorization', 'Headers', 'Body', 'Pre-request Script', 'Tests', 'Settings']
 
 export default function RequestBuilder() {
-  const { activeTab, activeTabId, updateTab, sendRequest } = useApp()
+  const { activeTab, activeTabId, updateTab, sendRequest, saveRequest } = useApp()
   const [reqTab, setReqTab] = useState('Params')
 
   if (!activeTab) return null
@@ -279,7 +279,9 @@ export default function RequestBuilder() {
         </button>
 
         {/* Save button */}
-        <button className="flex items-center gap-1.5 px-3 py-1.5 border border-[#3D3D3D] text-xs font-medium text-[#CCCCCC] hover:border-[#FF6C37]/50 hover:text-white rounded transition-colors shrink-0">
+        <button 
+          onClick={() => saveRequest(activeTab)}
+          className="flex items-center gap-1.5 px-3 py-1.5 border border-[#3D3D3D] text-xs font-medium text-[#CCCCCC] hover:border-[#FF6C37]/50 hover:text-white rounded transition-colors shrink-0">
           <Save size={13} />
           Save
         </button>

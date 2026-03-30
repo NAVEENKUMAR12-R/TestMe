@@ -324,13 +324,13 @@ function MonitorsPanel() {
 }
 
 function HistoryPanel() {
-  const { history, addTab } = useApp()
+  const { history, addTab, clearHistory } = useApp()
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 pt-3 pb-2 shrink-0">
+      <div className="flex items-center justify-between p-3 border-b border-[#3D3D3D]">
         <span className="text-xs font-semibold text-[#CCCCCC]">History</span>
         {history.length > 0 && (
-          <button className="text-[#8D8D8D] hover:text-red-400 text-[10px] transition-colors">Clear</button>
+          <button onClick={clearHistory} className="text-[#8D8D8D] hover:text-red-400 text-[10px] transition-colors">Clear</button>
         )}
       </div>
       <div className="flex-1 overflow-y-auto px-1">

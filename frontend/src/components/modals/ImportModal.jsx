@@ -145,7 +145,24 @@ export default function ImportModal() {
     setDragOver(false)
     const file = e.dataTransfer.files[0]
     if (file) {
-      setRawText(`// File: ${file.name}\n// Size: ${(file.size / 1024).toFixed(1)} KB\n// Ready to import...`)
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setRawText(e.target.result)
+        setImportType('raw')
+      }
+      reader.readAsText(file)
+    }
+  }
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setRawText(e.target.result)
+        setImportType('raw')
+      }
+      reader.readAsText(file)
     }
   }
 
@@ -204,9 +221,12 @@ export default function ImportModal() {
               </div>
               <p className="text-sm font-medium text-[#CCCCCC] mb-1">Drop your file here or click to browse</p>
               <p className="text-xs text-[#5A5A5A] mb-4">Supports: .json, .yaml, .yml, .har, .wsdl, .raml</p>
-              <button className="px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors">
-                Choose File
-              </button>
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <label className="cursor-pointer px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors inline-block w-fit mx-auto">
+                  Choose File
+                  <input type="file" className="hidden" onChange={handleFileSelect} accept=".json,.yaml,.yml" />
+                </label>
+              </div>
               <div className="mt-4 grid grid-cols-3 gap-2">
                 {['Postman Collection v2', 'OpenAPI 3.0', 'Swagger 2.0', 'HAR', 'RAML', 'WSDL'].map(fmt => (
                   <div key={fmt} className="text-[10px] text-[#5A5A5A] bg-[#2D2D2D] rounded px-2 py-1">{fmt}</div>

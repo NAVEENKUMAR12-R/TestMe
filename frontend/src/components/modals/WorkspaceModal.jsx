@@ -38,7 +38,7 @@ export default function WorkspaceModal() {
     if (!name.trim()) return
     setCreating(true)
     setTimeout(() => {
-      addWorkspace(name.trim(), type)
+      addWorkspace(name.trim(), type, summary.trim())
       setDone(true)
       setTimeout(() => closeModal('workspace'), 700)
     }, 600)

@@ -1,0 +1,11 @@
+{
+  "projectId": "fccd1f20-5c67-4b27-9c83-192c61d2d865",
+  "createdAt": 1774770512130,
+  "startupCommands": [
+    "npm install --prefix C:/Users/vimal/merging/clone-postman/backend; npm --prefix C:/Users/vimal/merging/clone-postman/backend run dev",
+    "npm install --prefix C:/Users/vimal/merging/clone-postman/frontend; node C:/Users/vimal/merging/clone-postman/frontend/node_modules/vite/bin/vite.js C:/Users/vimal/merging/clone-postman/frontend --config C:/Users/vimal/merging/clone-postman/frontend/vite.config.js --host 0.0.0.0 --port 5173"
+  ],
+  "templateId": "any"
+}
+
+

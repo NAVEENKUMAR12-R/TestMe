@@ -7,7 +7,7 @@ const WS_TYPES = [
     value: 'personal',
     label: 'Personal',
     icon: Lock,
-    color: '#FF6C37',
+    color: '#06B6D4',
     desc: 'Only you can access this workspace. Great for personal projects.',
   },
   {
@@ -68,7 +68,7 @@ export default function WorkspaceModal() {
               onChange={e => setName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleCreate()}
               placeholder="e.g. Payment Gateway, Mobile App API..."
-              className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 py-2.5 text-sm text-[#CCCCCC] placeholder:text-[#3D3D3D] outline-none focus:border-[#FF6C37]/50 transition-colors"
+              className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 py-2.5 text-sm text-[#CCCCCC] placeholder:text-[#3D3D3D] outline-none focus:border-[#06B6D4]/50 focus:ring-1 focus:ring-[#06B6D4]/20 transition-all"
             />
           </div>
 
@@ -85,7 +85,7 @@ export default function WorkspaceModal() {
                     onClick={() => setType(t.value)}
                     className={`flex flex-col items-center gap-2 p-4 rounded-lg border text-center transition-all ${
                       isSelected
-                        ? 'border-[#FF6C37]/50 bg-[#FF6C37]/5'
+                        ? 'border-[#06B6D4]/50 bg-[#06B6D4]/5'
                         : 'border-[#3D3D3D] hover:border-[#5A5A5A] hover:bg-[#2D2D2D]'
                     }`}
                   >
@@ -114,7 +114,7 @@ export default function WorkspaceModal() {
               onChange={e => setSummary(e.target.value)}
               placeholder="What APIs will you be working with here?"
               rows={2}
-              className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 py-2.5 text-sm text-[#CCCCCC] placeholder:text-[#3D3D3D] outline-none focus:border-[#FF6C37]/50 transition-colors resize-none"
+              className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 py-2.5 text-sm text-[#CCCCCC] placeholder:text-[#3D3D3D] outline-none focus:border-[#06B6D4]/50 focus:ring-1 focus:ring-[#06B6D4]/20 transition-all resize-none"
             />
           </div>
 
@@ -132,7 +132,7 @@ export default function WorkspaceModal() {
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium rounded-lg transition-all ${
                 done
                   ? 'bg-[#49CC90]/20 text-[#49CC90] border border-[#49CC90]/30'
-                  : 'bg-[#FF6C37] hover:bg-[#e05a2a] text-white disabled:opacity-40 disabled:cursor-not-allowed'
+                  : 'bg-[#06B6D4] hover:bg-[#0891B2] text-white disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-cyan-500/30'
               }`}
             >
               {done ? (

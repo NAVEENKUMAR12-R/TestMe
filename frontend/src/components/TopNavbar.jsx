@@ -44,7 +44,7 @@ export default function TopNavbar() {
         className="flex items-center gap-2 mr-2 shrink-0 cursor-pointer"
         onClick={() => setActivePage('home')}
       >
-        <div className="w-7 h-7 rounded bg-[#FF6C37] flex items-center justify-center">
+        <div className="w-7 h-7 rounded bg-[#06B6D4] flex items-center justify-center shadow-lg shadow-cyan-500/20">
           <Send size={13} className="text-white" />
         </div>
         <span className="text-sm font-bold text-[#CCCCCC] hidden sm:block">PostFlow</span>
@@ -58,7 +58,7 @@ export default function TopNavbar() {
               onClick={() => setActivePage(id)}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded transition-colors ${
                 activePage === id
-                  ? 'bg-[#FF6C37]/15 text-[#FF6C37]'
+                  ? 'bg-[#06B6D4]/15 text-[#06B6D4]'
                   : 'text-[#CCCCCC] hover:bg-[#2D2D2D]'
               }`}
             >
@@ -98,7 +98,7 @@ export default function TopNavbar() {
                         }`}
                       >
                         <div className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold shrink-0 ${
-                          ws.type === 'personal' ? 'bg-[#FF6C37]/20 text-[#FF6C37]' : 'bg-[#6C63FF]/20 text-[#6C63FF]'
+                          ws.type === 'personal' ? 'bg-[#06B6D4]/20 text-[#06B6D4]' : 'bg-[#6C63FF]/20 text-[#6C63FF]'
                         }`}>
                           {ws.name[0]}
                         </div>
@@ -108,7 +108,7 @@ export default function TopNavbar() {
                             {ws.type} · {ws.members.length} member{ws.members.length !== 1 ? 's' : ''}
                           </div>
                         </div>
-                        {ws.id === activeWorkspaceId && <CheckCircle2 size={14} className="text-[#FF6C37] shrink-0" />}
+                        {ws.id === activeWorkspaceId && <CheckCircle2 size={14} className="text-[#06B6D4] shrink-0" />}
                       </button>
                     ))}
                   </div>
@@ -130,7 +130,7 @@ export default function TopNavbar() {
 
       {/* Search */}
       <div className={`flex items-center gap-2 flex-1 max-w-md mx-auto h-8 px-3 rounded-md border transition-all ${
-        searchFocused ? 'bg-[#2D2D2D] border-[#FF6C37]/50' : 'bg-[#2D2D2D] border-[#3D3D3D]'
+        searchFocused ? 'bg-[#2D2D2D] border-[#06B6D4]/50' : 'bg-[#2D2D2D] border-[#3D3D3D]'
       }`}>
         <Search size={13} className="text-[#8D8D8D] shrink-0" />
         <input
@@ -170,7 +170,7 @@ export default function TopNavbar() {
         {/* Invite */}
         <button
           onClick={() => openModal('team')}
-          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#CCCCCC] border border-[#3D3D3D] hover:border-[#FF6C37]/50 hover:text-white rounded transition-colors"
+          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#CCCCCC] border border-[#3D3D3D] hover:border-[#06B6D4]/50 hover:text-white rounded transition-colors"
         >
           <Users size={12} />
           Invite
@@ -180,7 +180,7 @@ export default function TopNavbar() {
         <div className="relative">
           <button
             onClick={() => setNewDropdown(!newDropdown)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#06B6D4] hover:bg-[#0891B2] rounded transition-all hover:shadow-lg hover:shadow-cyan-500/20"
           >
             <Plus size={12} />
             <span className="hidden sm:block">New</span>
@@ -215,12 +215,12 @@ export default function TopNavbar() {
 
         <button className="relative w-8 h-8 flex items-center justify-center text-[#8D8D8D] hover:text-[#CCCCCC] hover:bg-[#2D2D2D] rounded transition-colors">
           <Bell size={15} />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-[#FF6C37] rounded-full border border-[#1C1C1C]" />
+          <span className="absolute top-1 right-1 w-2 h-2 bg-[#06B6D4] rounded-full border border-[#1C1C1C]" />
         </button>
         <button
           onClick={() => setActivePage('settings')}
           className={`w-8 h-8 flex items-center justify-center hover:bg-[#2D2D2D] rounded transition-colors ${
-            activePage === 'settings' ? 'text-[#FF6C37]' : 'text-[#8D8D8D] hover:text-[#CCCCCC]'
+            activePage === 'settings' ? 'text-[#06B6D4]' : 'text-[#8D8D8D] hover:text-[#CCCCCC]'
           }`}
           title="Settings"
         >
@@ -250,8 +250,8 @@ export default function TopNavbar() {
           <div className="relative">
             <button
               onClick={() => setAccountDropdown((prev) => !prev)}
-              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ml-1 cursor-pointer border-2"
-              style={{ backgroundColor: '#FF6C37', borderColor: '#FF6C37', color: 'white' }}
+              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ml-1 cursor-pointer border-2 transition-all hover:shadow-lg hover:shadow-cyan-500/30"
+              style={{ backgroundColor: '#06B6D4', borderColor: '#06B6D4', color: 'white' }}
               title={displayName}
             >
               {userInitial}

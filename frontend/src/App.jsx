@@ -55,7 +55,7 @@ function AuthScreen() {
     <div className="min-h-screen bg-[#141414] text-[#CCCCCC] flex items-center justify-center p-6">
       <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 rounded-2xl overflow-hidden border border-[#2A2A2A] shadow-2xl">
         <div className="bg-gradient-to-br from-[#1F1F1F] to-[#181818] p-8 lg:p-10 border-b lg:border-b-0 lg:border-r border-[#2F2F2F]">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FF6C37]/15 text-[#FF6C37] text-xs font-semibold mb-6">PostFlow</div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#06B6D4]/15 text-[#06B6D4] text-xs font-semibold mb-6">PostFlow</div>
           <h1 className="text-3xl font-semibold text-white leading-tight mb-4">Build, test, automate APIs like real Postman teams.</h1>
           <p className="text-sm text-[#A8A8A8] leading-6">
             Sign in to access workspaces, collections, environments, flows, monitors, and mock servers backed by Supabase.
@@ -72,14 +72,14 @@ function AuthScreen() {
             <button
               type="button"
               onClick={() => { setMode('signin'); clearAuthError(); setMessage('') }}
-              className={`flex-1 py-2 rounded-md text-sm transition-colors ${mode === 'signin' ? 'bg-[#FF6C37] text-white' : 'text-[#A0A0A0] hover:text-white'}`}
+              className={`flex-1 py-2 rounded-md text-sm transition-all ${mode === 'signin' ? 'bg-[#06B6D4] text-white shadow-lg shadow-cyan-500/20' : 'text-[#A0A0A0] hover:text-white'}`}
             >
               Sign in
             </button>
             <button
               type="button"
               onClick={() => { setMode('signup'); clearAuthError(); setMessage('') }}
-              className={`flex-1 py-2 rounded-md text-sm transition-colors ${mode === 'signup' ? 'bg-[#FF6C37] text-white' : 'text-[#A0A0A0] hover:text-white'}`}
+              className={`flex-1 py-2 rounded-md text-sm transition-all ${mode === 'signup' ? 'bg-[#06B6D4] text-white shadow-lg shadow-cyan-500/20' : 'text-[#A0A0A0] hover:text-white'}`}
             >
               Sign up
             </button>
@@ -93,7 +93,7 @@ function AuthScreen() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="w-full h-11 px-3 rounded-md bg-[#252525] border border-[#383838] focus:border-[#FF6C37] focus:outline-none text-sm"
+                  className="w-full h-11 px-3 rounded-md bg-[#252525] border border-[#383838] focus:border-[#06B6D4] focus:ring-1 focus:ring-[#06B6D4]/20 focus:outline-none text-sm transition-all"
                   placeholder="Your name"
                 />
               </div>
@@ -105,7 +105,7 @@ function AuthScreen() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full h-11 px-3 rounded-md bg-[#252525] border border-[#383838] focus:border-[#FF6C37] focus:outline-none text-sm"
+                className="w-full h-11 px-3 rounded-md bg-[#252525] border border-[#383838] focus:border-[#06B6D4] focus:ring-1 focus:ring-[#06B6D4]/20 focus:outline-none text-sm transition-all"
                 placeholder="name@company.com"
               />
             </div>
@@ -117,7 +117,7 @@ function AuthScreen() {
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={6}
                 required
-                className="w-full h-11 px-3 rounded-md bg-[#252525] border border-[#383838] focus:border-[#FF6C37] focus:outline-none text-sm"
+                className="w-full h-11 px-3 rounded-md bg-[#252525] border border-[#383838] focus:border-[#06B6D4] focus:ring-1 focus:ring-[#06B6D4]/20 focus:outline-none text-sm transition-all"
                 placeholder="At least 6 characters"
               />
             </div>
@@ -128,7 +128,7 @@ function AuthScreen() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-11 rounded-md bg-[#FF6C37] hover:bg-[#e55f2f] disabled:opacity-60 text-white text-sm font-medium transition-colors"
+              className="w-full h-11 rounded-md bg-[#06B6D4] hover:bg-[#0891B2] disabled:opacity-60 text-white text-sm font-medium transition-all hover:shadow-lg hover:shadow-cyan-500/40"
             >
               {loading ? 'Please wait...' : mode === 'signin' ? 'Sign in to PostFlow' : 'Create account'}
             </button>

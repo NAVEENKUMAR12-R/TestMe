@@ -46,7 +46,7 @@ function Toggle({ value, onChange }) {
   return (
     <button
       onClick={() => onChange(!value)}
-      className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${value ? 'bg-[#FF6C37]' : 'bg-[#3D3D3D]'}`}
+      className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${value ? 'bg-[#06B6D4]' : 'bg-[#3D3D3D]'}`}
     >
       <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${value ? 'translate-x-4' : ''}`} />
     </button>
@@ -236,9 +236,9 @@ export default function SettingsPage() {
               <button
                 key={s}
                 onClick={() => setActiveSection(s)}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-colors text-left ${
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all text-left ${
                   activeSection === s
-                    ? 'bg-[#FF6C37]/15 text-[#FF6C37]'
+                    ? 'bg-[#06B6D4]/15 text-[#06B6D4]'
                     : 'text-[#8D8D8D] hover:text-[#CCCCCC] hover:bg-[#2D2D2D]'
                 }`}
                 >
@@ -328,9 +328,9 @@ export default function SettingsPage() {
                       <button
                         key={id}
                         onClick={() => update('theme', id)}
-                        className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg border text-xs transition-colors ${
+                        className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg border text-xs transition-all ${
                           localSettings.theme === id
-                            ? 'border-[#FF6C37] text-[#FF6C37] bg-[#FF6C37]/10'
+                            ? 'border-[#06B6D4] text-[#06B6D4] bg-[#06B6D4]/10'
                             : 'border-[#3D3D3D] text-[#8D8D8D] hover:border-[#5A5A5A]'
                         }`}
                         >
@@ -409,14 +409,14 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-4">
                   <div
                     className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold shrink-0"
-                    style={{ backgroundColor: '#FF6C37', color: 'white' }}
+                    style={{ backgroundColor: '#06B6D4', color: 'white' }}
                   >
                     Y
                   </div>
                   <div>
                     <div className="text-sm font-semibold text-white">You</div>
                       <div className="text-xs text-[#5A5A5A]">you@example.com</div>
-                    <div className="mt-1.5 px-2 py-0.5 text-[10px] font-medium bg-[#FF6C37]/15 text-[#FF6C37] rounded-full w-fit">
+                    <div className="mt-1.5 px-2 py-0.5 text-[10px] font-medium bg-[#06B6D4]/15 text-[#06B6D4] rounded-full w-fit">
                       Pro Plan
                     </div>
                   </div>
@@ -431,7 +431,7 @@ export default function SettingsPage() {
                   <SettingRow key={label} label={label}>
                     <input
                       defaultValue={value}
-                      className="w-48 h-8 px-3 bg-[#1C1C1C] border border-[#3D3D3D] rounded text-xs text-[#CCCCCC] outline-none focus:border-[#FF6C37]/50"
+                      className="w-48 h-8 px-3 bg-[#1C1C1C] border border-[#3D3D3D] rounded text-xs text-[#CCCCCC] outline-none focus:border-[#06B6D4]/50 focus:ring-1 focus:ring-[#06B6D4]/20 transition-all"
                     />
                   </SettingRow>
                 ))}
@@ -536,10 +536,10 @@ export default function SettingsPage() {
             <div className="flex justify-end mt-6">
               <button
                 onClick={handleSave}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                   saved
                     ? 'bg-[#49CC90]/20 text-[#49CC90] border border-[#49CC90]/30'
-                    : 'bg-[#FF6C37] hover:bg-[#e05a2a] text-white'
+                    : 'bg-[#06B6D4] hover:bg-[#0891B2] text-white hover:shadow-lg hover:shadow-cyan-500/30'
                 }`}
               >
                 {saved ? <><Check size={14} /> Saved!</> : <><Save size={14} /> Save Changes</>}

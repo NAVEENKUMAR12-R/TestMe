@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext'
 import { X, Users, Mail, Crown, Edit2, Eye, Trash2, Shield, Plus, Check, UserPlus } from 'lucide-react'
 
 const ROLE_CONFIG = {
-  owner: { label: 'Owner', color: '#FF6C37', icon: Crown, desc: 'Full access, billing, delete workspace' },
+  owner: { label: 'Owner', color: '#06B6D4', icon: Crown, desc: 'Full access, billing, delete workspace' },
   editor: { label: 'Editor', color: '#6C63FF', icon: Edit2, desc: 'Can create, edit, delete collections' },
   viewer: { label: 'Viewer', color: '#00BFA5', icon: Eye, desc: 'Read-only access to collections' },
 }
@@ -84,8 +84,8 @@ export default function TeamModal() {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#3D3D3D] bg-[#1C1C1C]">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#FF6C37]/15 flex items-center justify-center">
-              <Users size={18} className="text-[#FF6C37]" />
+            <div className="w-9 h-9 rounded-lg bg-[#06B6D4]/15 flex items-center justify-center">
+              <Users size={18} className="text-[#06B6D4]" />
             </div>
             <div>
               <h2 className="text-sm font-semibold text-white">{activeWorkspace.name}</h2>
@@ -104,7 +104,7 @@ export default function TeamModal() {
               key={t}
               onClick={() => setTab(t)}
               className={`pb-3 pt-3 mr-6 text-xs font-medium border-b-2 capitalize transition-colors ${
-                tab === t ? 'border-[#FF6C37] text-white' : 'border-transparent text-[#8D8D8D] hover:text-[#CCCCCC]'
+                tab === t ? 'border-[#06B6D4] text-white' : 'border-transparent text-[#8D8D8D] hover:text-[#CCCCCC]'
               }`}
             >
               {t}
@@ -118,11 +118,11 @@ export default function TeamModal() {
               {/* Invite section */}
               <div>
                 <div className="text-xs font-semibold text-[#CCCCCC] mb-3 flex items-center gap-2">
-                  <UserPlus size={13} className="text-[#FF6C37]" />
+                  <UserPlus size={13} className="text-[#06B6D4]" />
                   Invite new member
                 </div>
                 <div className="flex gap-2">
-                  <div className="flex-1 flex items-center bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 focus-within:border-[#FF6C37]/50 transition-colors">
+                  <div className="flex-1 flex items-center bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 focus-within:border-[#06B6D4]/50 focus-within:ring-1 focus-within:ring-[#06B6D4]/20 transition-all">
                     <Mail size={13} className="text-[#5A5A5A] shrink-0 mr-2" />
                     <input
                       type="email"
@@ -136,17 +136,17 @@ export default function TeamModal() {
                   <select
                     value={inviteRole}
                     onChange={e => setInviteRole(e.target.value)}
-                    className="bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 py-2 text-xs text-[#CCCCCC] outline-none cursor-pointer hover:border-[#FF6C37]/50 transition-colors"
+                    className="bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 py-2 text-xs text-[#CCCCCC] outline-none cursor-pointer hover:border-[#06B6D4]/50 transition-all"
                   >
                     <option value="editor" className="bg-[#252525]">Editor</option>
                     <option value="viewer" className="bg-[#252525]">Viewer</option>
                   </select>
                   <button
                     onClick={handleInvite}
-                    className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg transition-all ${
                       inviteSent
                         ? 'bg-[#49CC90]/20 text-[#49CC90] border border-[#49CC90]/30'
-                        : 'bg-[#FF6C37] hover:bg-[#e05a2a] text-white'
+                        : 'bg-[#06B6D4] hover:bg-[#0891B2] text-white hover:shadow-lg hover:shadow-cyan-500/20'
                     }`}
                   >
                     {inviteSent ? <><Check size={13} /> Sent!</> : <><Plus size={13} /> Invite</>}
@@ -184,7 +184,7 @@ export default function TeamModal() {
                           <div className="text-xs font-medium text-[#CCCCCC] flex items-center gap-2">
                             {member.name}
                             {member.id === 'u-1' && (
-                              <span className="text-[9px] px-1.5 py-0.5 bg-[#FF6C37]/15 text-[#FF6C37] rounded-full font-medium">You</span>
+                              <span className="text-[9px] px-1.5 py-0.5 bg-[#06B6D4]/15 text-[#06B6D4] rounded-full font-medium">You</span>
                             )}
                           </div>
                           <div className="text-[11px] text-[#5A5A5A] truncate">{member.email}</div>
@@ -202,7 +202,7 @@ export default function TeamModal() {
                             <select
                               value={member.role}
                               onChange={e => updateMemberRole(activeWorkspace.id, member.id, e.target.value)}
-                              className="bg-[#1C1C1C] border border-[#3D3D3D] rounded px-2 py-1 text-xs text-[#CCCCCC] outline-none cursor-pointer hover:border-[#FF6C37]/30 transition-colors"
+                              className="bg-[#1C1C1C] border border-[#3D3D3D] rounded px-2 py-1 text-xs text-[#CCCCCC] outline-none cursor-pointer hover:border-[#06B6D4]/30 transition-all"
                             >
                               <option value="editor" className="bg-[#252525]">Editor</option>
                               <option value="viewer" className="bg-[#252525]">Viewer</option>
@@ -252,7 +252,7 @@ export default function TeamModal() {
                   <input
                     value={workspaceName}
                     onChange={e => setWorkspaceName(e.target.value)}
-                    className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 py-2 text-sm text-[#CCCCCC] outline-none focus:border-[#FF6C37]/50"
+                    className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 py-2 text-sm text-[#CCCCCC] outline-none focus:border-[#06B6D4]/50 focus:ring-1 focus:ring-[#06B6D4]/20 transition-all"
                   />
                 </div>
                 <div className="space-y-1">
@@ -261,13 +261,13 @@ export default function TeamModal() {
                     value={workspaceDescription}
                     onChange={e => setWorkspaceDescription(e.target.value)}
                     rows={3}
-                    className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 py-2 text-sm text-[#CCCCCC] outline-none focus:border-[#FF6C37]/50 resize-none"
+                    className="w-full bg-[#1C1C1C] border border-[#3D3D3D] rounded-lg px-3 py-2 text-sm text-[#CCCCCC] outline-none focus:border-[#06B6D4]/50 focus:ring-1 focus:ring-[#06B6D4]/20 transition-all resize-none"
                   />
                 </div>
                 <div className="flex gap-3">
                   <button
                     onClick={handleSaveWorkspace}
-                    className="px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors disabled:opacity-50"
+                    className="px-4 py-2 text-xs font-medium text-white bg-[#06B6D4] hover:bg-[#0891B2] rounded-lg transition-all hover:shadow-lg hover:shadow-cyan-500/20 disabled:opacity-50"
                     disabled={savingWorkspace || !workspaceName.trim()}
                   >
                     {savingWorkspace ? 'Saving...' : 'Save Changes'}

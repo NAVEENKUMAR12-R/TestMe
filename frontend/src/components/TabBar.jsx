@@ -26,7 +26,7 @@ export default function TabBar() {
           >
             {/* Active indicator */}
             {isActive && (
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-[#FF6C37]" />
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-[#06B6D4]" />
             )}
 
             {/* Method dot */}

@@ -28,7 +28,7 @@ function QuickAction({ icon: Icon, label, desc, color, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-start gap-3 p-4 bg-[#252525] border border-[#3D3D3D] rounded-xl hover:border-[#FF6C37]/40 hover:bg-[#2A2A2A] transition-all text-left group"
+      className="flex items-start gap-3 p-4 bg-[#252525] border border-[#3D3D3D] rounded-xl hover:border-[#06B6D4]/40 hover:bg-[#2A2A2A] transition-all text-left group hover:shadow-lg hover:shadow-cyan-500/10"
     >
         <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: color + '20' }}>
           {createElement(Icon, { size: 16, style: { color } })}
@@ -38,7 +38,7 @@ function QuickAction({ icon: Icon, label, desc, color, onClick }) {
         <div className="text-sm font-medium text-[#CCCCCC] group-hover:text-white transition-colors">{label}</div>
         <div className="text-[11px] text-[#5A5A5A] mt-0.5">{desc}</div>
       </div>
-      <ArrowRight size={14} className="text-[#3D3D3D] group-hover:text-[#FF6C37] mt-1 transition-colors shrink-0" />
+      <ArrowRight size={14} className="text-[#3D3D3D] group-hover:text-[#06B6D4] mt-1 transition-colors shrink-0" />
     </button>
   )
 }
@@ -60,7 +60,7 @@ export default function HomePage() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold"
-                style={{ backgroundColor: activeWorkspace?.type === 'personal' ? '#FF6C37' : '#6C63FF', color: 'white' }}>
+                style={{ backgroundColor: activeWorkspace?.type === 'personal' ? '#06B6D4' : '#6C63FF', color: 'white' }}>
                 {activeWorkspace?.name?.[0]}
               </div>
               <div>
@@ -73,13 +73,13 @@ export default function HomePage() {
           <div className="flex gap-2">
             <button
               onClick={() => openModal('team')}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-[#CCCCCC] border border-[#3D3D3D] hover:border-[#FF6C37]/40 hover:text-white rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-[#CCCCCC] border border-[#3D3D3D] hover:border-[#06B6D4]/40 hover:text-white rounded-lg transition-all hover:shadow-md hover:shadow-cyan-500/10"
             >
               <Users size={13} /> Manage Team
             </button>
             <button
               onClick={() => { addTab(); setActivePage('builder') }}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#FF6C37] hover:bg-[#e05a2a] rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-[#06B6D4] hover:bg-[#0891B2] rounded-lg transition-all hover:shadow-lg hover:shadow-cyan-500/30"
             >
               <Plus size={13} /> New Request
             </button>
@@ -95,8 +95,7 @@ export default function HomePage() {
                 title={`${m.name} (${m.role})`}
                 className="w-8 h-8 rounded-full border-2 border-[#252525] flex items-center justify-center text-[10px] font-bold cursor-pointer"
                 style={{ backgroundColor: m.color + '40', color: m.color }}
-              >
-                {m.initials}
+              >                {m.initials}
               </div>
             ))}
           </div>
@@ -116,7 +115,7 @@ export default function HomePage() {
         <div>
           <h2 className="text-sm font-semibold text-[#CCCCCC] mb-4">Overview</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard icon={FolderOpen} label="Collections" value={wsCollections.length} sub={`${wsCollections.reduce((n, c) => { const count = (items) => items?.reduce((a, i) => a + (i.type === 'request' ? 1 : count(i.items)), 0) || 0; return n + count(c.items) }, 0)} total requests`} color="#FF6C37" />
+            <StatCard icon={FolderOpen} label="Collections" value={wsCollections.length} sub={`${wsCollections.reduce((n, c) => { const count = (items) => items?.reduce((a, i) => a + (i.type === 'request' ? 1 : count(i.items)), 0) || 0; return n + count(c.items) }, 0)} total requests`} color="#06B6D4" />
             <StatCard icon={Activity} label="Monitors" value={monitors.length} sub={`${passingMonitors} passing`} color="#49CC90" />
             <StatCard icon={Server} label="Mock Servers" value={mockServers.length} sub={`${activeMocks} active`} color="#6C63FF" />
             <StatCard icon={Zap} label="Flows" value={flows.length} sub={`${flows.filter(f => f.status === 'active').length} active`} color="#FCA130" />
@@ -127,7 +126,7 @@ export default function HomePage() {
         <div>
           <h2 className="text-sm font-semibold text-[#CCCCCC] mb-4">Quick Actions</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            <QuickAction icon={Send} label="New HTTP Request" desc="Create and send a new API request" color="#FF6C37" onClick={() => { addTab(); setActivePage('builder') }} />
+            <QuickAction icon={Send} label="New HTTP Request" desc="Create and send a new API request" color="#06B6D4" onClick={() => { addTab(); setActivePage('builder') }} />
             <QuickAction icon={FolderOpen} label="New Collection" desc="Organize related requests together" color="#FCA130" onClick={() => { setSidePanel('collections'); setActivePage('builder') }} />
             <QuickAction icon={Globe} label="Import from URL / File" desc="Import OpenAPI, Swagger, cURL, HAR" color="#61AFFE" onClick={() => openModal('import')} />
             <QuickAction icon={Zap} label="Create a Flow" desc="Build multi-step request workflows" color="#6C63FF" onClick={() => setActivePage('flows')} />
@@ -141,7 +140,7 @@ export default function HomePage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-[#CCCCCC]">Recent Requests</h2>
-              <button onClick={() => { setSidePanel('history'); setActivePage('builder') }} className="text-[11px] text-[#FF6C37] hover:underline flex items-center gap-1">
+              <button onClick={() => { setSidePanel('history'); setActivePage('builder') }} className="text-[11px] text-[#06B6D4] hover:underline flex items-center gap-1 transition-colors">
                 View all <ChevronRight size={11} />
               </button>
             </div>
@@ -172,7 +171,7 @@ export default function HomePage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-[#CCCCCC]">Monitor Status</h2>
-              <button onClick={() => setActivePage('monitors')} className="text-[11px] text-[#FF6C37] hover:underline flex items-center gap-1">
+              <button onClick={() => setActivePage('monitors')} className="text-[11px] text-[#06B6D4] hover:underline flex items-center gap-1 transition-colors">
                 View all <ChevronRight size={11} />
               </button>
             </div>
@@ -198,7 +197,7 @@ export default function HomePage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-[#CCCCCC]">Collections</h2>
-            <button onClick={() => { setSidePanel('collections'); setActivePage('builder') }} className="text-[11px] text-[#FF6C37] hover:underline flex items-center gap-1">
+            <button onClick={() => { setSidePanel('collections'); setActivePage('builder') }} className="text-[11px] text-[#06B6D4] hover:underline flex items-center gap-1 transition-colors">
               Browse all <ChevronRight size={11} />
             </button>
           </div>
@@ -216,11 +215,11 @@ export default function HomePage() {
                   <div
                     key={col.id}
                     onClick={() => { setSidePanel('collections'); setActivePage('builder') }}
-                    className="bg-[#252525] border border-[#3D3D3D] rounded-xl p-4 hover:border-[#FF6C37]/40 cursor-pointer transition-all group"
+                    className="bg-[#252525] border border-[#3D3D3D] rounded-xl p-4 hover:border-[#06B6D4]/40 cursor-pointer transition-all group hover:shadow-lg hover:shadow-cyan-500/10"
                   >
                     <div className="flex items-start gap-3 mb-3">
-                      <div className="w-8 h-8 rounded-lg bg-[#FF6C37]/15 flex items-center justify-center shrink-0">
-                        <FolderOpen size={14} className="text-[#FF6C37]" />
+                      <div className="w-8 h-8 rounded-lg bg-[#06B6D4]/15 flex items-center justify-center shrink-0">
+                        <FolderOpen size={14} className="text-[#06B6D4]" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-[#CCCCCC] group-hover:text-white truncate transition-colors">{col.name}</div>
